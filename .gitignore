@@ -15,3 +15,4 @@ runs/*/scores.parquet
 runs/*/latency.parquet
 
 .env
+results/

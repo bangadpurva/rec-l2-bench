@@ -89,3 +89,29 @@ def test_hnsw_matches_exact_on_small_catalog(raw):
     rep = json.loads((proc / "l1_report.json").read_text())
     assert rep["splits"]["valid"]["gate_passed"]
     assert rep["splits"]["valid"]["ann_overlap@100"] > 0.95
+
+
+def test_score_baselines_and_report(raw):
+    import report
+    import score
+    proc, pools_dir, runs = raw / "processed", raw / "pools", raw / "runs"
+    prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
+                       "--out", str(proc), "--n-valid", "40", "--n-test", "80",
+                       "--tokenizer", "whitespace"])
+    run_l1.main(["--dataset-config", str(ROOT / "configs/dataset.yaml"),
+                 "--l1-config", str(ROOT / "configs/l1.yaml"), "--raw", str(raw / "raw"),
+                 "--proc", str(proc), "--pools-dir", str(pools_dir), "--encoder", "fake",
+                 "--index", "exact", "--freeze"])
+    common = ["--split", "test", "--raw", str(raw / "raw"), "--proc", str(proc),
+              "--pools-dir", str(pools_dir), "--configs", str(ROOT / "configs"), "--runs-dir", str(runs)]
+    for m in ("l1_order", "random", "popularity", "oracle"):
+        score.main(common + ["--model", m])
+    score.main(common + ["--model", "random", "--limit-users", "5", "--seed", "9"])  # excluded
+    stem = report.main(["--split", "test", "--runs-dir", str(runs), "--out", str(raw / "results"),
+                        "--resamples", "500"])
+    table = pd.read_csv(stem.with_suffix(".csv")).set_index("model")
+    assert set(table.index) == {"l1_order", "random", "popularity", "oracle"}
+    assert table.loc["oracle", "ndcg@10"] >= table["ndcg@10"].max() - 1e-12
+    assert pd.isna(table.loc["l1_order", "p_holm"]) and pd.notna(table.loc["random", "p_holm"])
+    md = stem.with_suffix(".md").read_text()
+    assert "| oracle |" in md and "Beats L1" in md

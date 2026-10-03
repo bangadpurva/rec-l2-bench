@@ -58,7 +58,9 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | CLM | **Stub**: needs clm-serve API |
 | Data loading, profiles, item text | Done, tested on synthetic files in the real format |
 | L1 embed, exact + HNSW, gate, freeze | Done, tested with a fake encoder |
-| Baselines (popularity, SASRec), report | Not started |
+| Baselines: L1 order, random, popularity (90 d), oracle | Done, tested |
+| Scoring + results report (paired bootstrap, Holm) | Done, tested end to end |
+| SASRec, tabular baseline | Not started |
 
 ## Running L1 (GPU box)
 
@@ -74,6 +76,20 @@ python scripts/run_l1.py --half-life <best> --index hnsw --freeze   # irreversib
 Read `data/pools/l1_report.json` before any L2 work: Recall@50/100/200, ANN overlap,
 and `max_reachable_share` (positives that are neither already-seen nor first seen after
 query time). Recall can never exceed that ceiling.
+
+## Scoring and the results table
+
+After pools are frozen (one run per model; `--limit-users N` runs are smoke tests and are
+left out of the report):
+
+```bash
+for m in l1_order random popularity oracle; do python scripts/score.py --model $m --split test; done
+python scripts/score.py --model bge   --split test
+python scripts/score.py --model qwen3 --split test
+python scripts/score.py --model clef  --split valid --limit-users 20   # live smoke test first
+python scripts/score.py --model clef  --split test
+python scripts/report.py --split test     # -> results/test_m100.md and .csv
+```
 
 ## Before the first L2 run
 
