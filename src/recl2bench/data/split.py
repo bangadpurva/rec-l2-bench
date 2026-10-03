@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 
 # Exact cut points published with the Amazon'23 5-core timestamp split (Unix ms).
-VALID_START_MS = 1628643414042   # 2021-08-11 01:16:54 UTC
+VALID_START_MS = 1628643414042   # 2021-08-11 00:56:54 UTC
 TEST_START_MS = 1658002729837    # 2022-07-16 20:18:49 UTC
 VALID_START = pd.Timestamp(VALID_START_MS, unit="ms", tz="UTC")
 TEST_START = pd.Timestamp(TEST_START_MS, unit="ms", tz="UTC")

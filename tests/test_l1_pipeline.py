@@ -79,6 +79,7 @@ def test_prepare_and_l1(raw):
 
 
 def test_hnsw_matches_exact_on_small_catalog(raw):
+    pytest.importorskip("faiss")
     proc = raw / "processed"
     prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
                        "--out", str(proc), "--n-valid", "40", "--n-test", "40",
