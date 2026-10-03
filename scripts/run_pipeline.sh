@@ -28,6 +28,7 @@
 #   clef-smoke  Clef Flash on 20 validation users (needs .env keys)        STOP
 #   clef        Clef Flash on test
 #   report      results table -> results/<CAT>/
+#   fuse        Track C: reranker + L1/popularity rank fusion, weight from validation
 #   diagnose    top-10 share and positive ranks by L1 channel, per model
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -97,6 +98,8 @@ case "$STAGE" in
   clef)
     : "${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}" "${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID in .env}"
     run python scripts/score.py "${SCORE[@]}" --model clef ;;
+  fuse)
+    run python scripts/fuse.py --category "$CAT" ;;
   diagnose)
     run python scripts/diagnose_runs.py --category "$CAT" --split "$SPLIT" ;;
   report)

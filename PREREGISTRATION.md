@@ -98,3 +98,23 @@ The freeze ran before model revisions were pinned in the configs, so its report 
 the encoder as `@None`. Hugging Face `main` for Qwen/Qwen3-Embedding-0.6B was last changed
 2026-04-20, so the effective revision is `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, the
 value now pinned in `configs/l1.yaml` and used for the budget tokenizer.
+
+## Amendment 4 (2026-10-03): Track C fusion, fixed before any fusion test run
+
+**Disclosure.** Track A test results were known when this was written: BGE and
+Qwen3-Reranker scored below L1 order on test NDCG@10, and a test-set diagnostic
+(`scripts/diagnose_runs.py`) showed why: 67% of in-pool positives came from the
+popularity channel, and both rerankers moved popularity-sourced items out of the top 10
+while improving the ranks of dense-sourced positives. Fusion is motivated by that
+observation, so Track C test results are **exploratory**, not a pre-registered
+confirmatory test.
+
+**Method, fixed now.** For each reranker R in {BGE, Qwen3} and partner P in
+{L1 order, popularity}: weighted reciprocal-rank fusion,
+`score = w/(60 + rank_R) + (1 - w)/(60 + rank_P)`, ranks 1-based, ties by L1 rank.
+`w` is chosen from {0, 0.1, ..., 1.0} by mean NDCG@10 on the **validation** eval cohort
+(279 users), ties to the smaller w. Each pair is then scored **once** on the test eval
+cohort with that w. The grid is saved to `results/<CAT>/fusion_tuning.csv`.
+
+Fusion runs enter the same report and Holm family as Track A (four extra comparisons),
+which makes every adjusted p-value more conservative.

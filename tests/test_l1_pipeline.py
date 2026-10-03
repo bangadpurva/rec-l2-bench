@@ -219,6 +219,20 @@ def test_run_pipeline_stages_end_to_end(raw, tmp_path):
     for s_ in ("baselines", "report"):
         stage(s_)
     assert list((repo / "results" / cat).glob("valid_conditional_m100.md"))
+    # Track C fusion: weight from validation, one test run per pair, then in the report
+    f = subprocess.run(["python", "scripts/fuse.py", "--category", cat, "--rerankers", "random",
+                        "--partners", "l1_order,popularity"], cwd=repo, env=env, capture_output=True, text=True)
+    assert f.returncode == 0, f.stdout[-2000:] + f.stderr[-2000:]
+    tuning = pd.read_csv(repo / "results" / cat / "fusion_tuning.csv")
+    assert tuning.groupby(["reranker", "partner"]).chosen.sum().eq(1).all()
+    v = pd.read_csv(repo / "results" / cat / "valid_conditional_m100.csv").set_index("model")
+    g = tuning[(tuning.partner == "l1_order")].set_index("w")
+    assert g.loc[0.0, "ndcg@10"] == pytest.approx(v.loc["l1_order", "ndcg@10"])
+    assert g.loc[1.0, "ndcg@10"] == pytest.approx(v.loc["random", "ndcg@10"])
+    env["SPLIT"] = "test"
+    stage("report")
+    t = pd.read_csv(repo / "results" / cat / "test_conditional_m100.csv").set_index("model")
+    assert {"fusion_random+l1_order", "fusion_random+popularity"} <= set(t.index)
     d = pd.read_csv(repo / "results" / cat / "diagnose_test.csv").set_index("model")
     assert "random" in d.index and abs(d.filter(like="top10_share").sum(axis=1) - 1).max() < 1e-9
     # freeze is irreversible: a second freeze must fail
