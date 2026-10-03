@@ -54,3 +54,18 @@ def test_per_pair_through_adapter_with_retry(profile, candidates):
     be = ClefBackend("acct", "tok", transport=FakeHTTP([429, 529]))
     res = DecisionReranker(be, Q, "per_pair", concurrency=1).rerank(profile, candidates)
     assert res.retries == 2 and res.failures == 0 and res.model_version == "clef-flash"
+
+
+def test_score_builds_clef_from_its_config(monkeypatch):
+    """The path score.py takes: whole YAML config (with its own `name` key) -> backend."""
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    import score
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "tok")
+    args = type("A", (), {"scoring_mode": None, "seed": 0})()
+    rr, cfg, tsha, mode, conc = score.build("clef", args, {}, root / "configs")
+    assert rr.backend.name == "clef-flash" and mode == "per_pair" and tsha
+    assert rr.backend.url.endswith("/accounts/acct/ai/run/@cf/cloudflare/clef-flash")

@@ -109,7 +109,9 @@ class ClefBackend(Backend):
         return BackendReply(probs, data.get("model"))
 
 
-def make_backend(name: str, **cfg) -> Backend:
+def make_backend(backend: str, /, **cfg) -> Backend:
+    """`cfg` is a whole model config (it may carry its own `name`, `family`, ...)."""
+    name = backend
     if name in ("clef", "clef_flash"):
         import os
         return ClefBackend(os.environ[cfg.get("account_id_env", "CLOUDFLARE_ACCOUNT_ID")],
