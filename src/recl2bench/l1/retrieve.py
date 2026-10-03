@@ -103,15 +103,30 @@ def overlap_at_k(a: np.ndarray, b: np.ndarray, k: int) -> float:
     return float(np.mean([len(set(x[:k]) & set(y[:k])) / k for x, y in zip(a, b)]))
 
 
-def to_pool_frame(users, cohort, idx, sc, item_ids) -> pd.DataFrame:
+def to_pool_frame(users, cohort, idx, sc, item_ids, source=None) -> pd.DataFrame:
     qt = cohort.set_index("user_id")["query_time"]
     rows = []
     for i, u in enumerate(users):
         for r, (j, s) in enumerate(zip(idx[i], sc[i])):
             if j < 0:
                 break
-            rows.append((u, qt[u], r, item_ids[j], float(s)))
-    return pd.DataFrame(rows, columns=["user_id", "query_time", "rank", "parent_asin", "l1_score"])
+            rows.append((u, qt[u], r, item_ids[j], float(s),
+                         source[i, r] if source is not None else "dense"))
+    return pd.DataFrame(rows, columns=["user_id", "query_time", "rank", "parent_asin", "l1_score", "source"])
+
+
+def recall_table(idx: np.ndarray, users, positives, item_ids, ks=(50, 100, 200)) -> dict:
+    out = {}
+    for k in ks:
+        r, h = [], []
+        for i, u in enumerate(users):
+            got = {item_ids[j] for j in idx[i, :k] if j >= 0}
+            f = len(positives[u] & got)
+            r.append(f / len(positives[u]))
+            h.append(f > 0)
+        out[f"recall@{k}"] = float(np.mean(r))
+        out[f"users_with_pos@{k}"] = float(np.mean(h))
+    return out
 
 
 def positive_diagnostics(pools: pd.DataFrame, positives: dict[str, set], users: list[str],
@@ -120,17 +135,21 @@ def positive_diagnostics(pools: pd.DataFrame, positives: dict[str, set], users: 
     """Recall@K against all positives, and why positives are unreachable."""
     by_user = {u: g.sort_values("rank").parent_asin.tolist() for u, g in pools.groupby("user_id")}
     rec = {k: [] for k in ks}
+    hit = {k: [] for k in ks}
     n_pos = n_new = n_repeat = 0
     for u in users:
         pos = positives[u]
         ranked = by_user.get(u, [])
         for k in ks:
-            rec[k].append(len(pos & set(ranked[:k])) / len(pos))
+            found = len(pos & set(ranked[:k]))
+            rec[k].append(found / len(pos))
+            hit[k].append(found > 0)
         n_pos += len(pos)
         n_new += sum(1 for a in pos if not (first_seen.get(a, pd.NaT) < query_time[u]))
         n_repeat += len(pos & seen_before.get(u, set()))
     return {
         **{f"recall@{k}": float(np.mean(v)) for k, v in rec.items()},
+        **{f"users_with_pos@{k}": float(np.mean(v)) for k, v in hit.items()},
         "n_users": len(users), "n_positives": n_pos,
         "share_positives_not_yet_available": n_new / n_pos,
         "share_positives_already_seen": n_repeat / n_pos,

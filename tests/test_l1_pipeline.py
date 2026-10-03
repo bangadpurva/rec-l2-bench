@@ -116,3 +116,22 @@ def test_score_baselines_and_report(raw):
     assert pd.isna(table.loc["l1_order", "p_holm"]) and pd.notna(table.loc["random", "p_holm"])
     md = stem.with_suffix(".md").read_text()
     assert "| oracle |" in md and "Beats L1" in md
+
+
+def test_compare_and_freeze_merged_channels(raw):
+    proc, pools_dir = raw / "processed", raw / "pools"
+    prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
+                       "--out", str(proc), "--n-valid", "30", "--n-test", "30",
+                       "--tokenizer", "whitespace"])
+    common = ["--dataset-config", str(ROOT / "configs/dataset.yaml"),
+              "--l1-config", str(ROOT / "configs/l1.yaml"), "--raw", str(raw / "raw"),
+              "--proc", str(proc), "--pools-dir", str(pools_dir), "--encoder", "fake"]
+    run_l1.main(common + ["--compare-channels"])
+    t = pd.read_csv(proc / "l1_channels_test.csv").set_index("pool")
+    assert {"dense", "cooc", "pop", "dense+cooc+pop"} <= set(t.index)
+    run_l1.main(common + ["--index", "exact", "--channels", "dense,cooc,pop", "--freeze"])
+    pools, _ = P.load(pools_dir / "pools_test.parquet")
+    assert set(pools.source) <= {"dense", "cooc", "pop"} and len(set(pools.source)) > 1
+    assert not pools.duplicated(["user_id", "parent_asin"]).any()
+    rep = json.loads((pools_dir / "l1_report.json").read_text())["splits"]["test"]
+    assert "users_with_pos@100" in rep and "channel_cooc" in rep

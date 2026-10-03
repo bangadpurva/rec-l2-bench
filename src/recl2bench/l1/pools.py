@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 POOL_COLUMNS = ["user_id", "query_time", "rank", "parent_asin", "l1_score"]
+OPTIONAL_COLUMNS = ["source"]   # L1 channel that contributed the item
 
 
 def sha256_file(path: str | Path) -> str:
@@ -24,7 +25,8 @@ def freeze(pools: pd.DataFrame, path: str | Path, overwrite: bool = False) -> st
     missing = set(POOL_COLUMNS) - set(pools.columns)
     if missing:
         raise ValueError(f"pool table missing columns {missing}")
-    df = pools[POOL_COLUMNS].sort_values(["user_id", "rank"]).reset_index(drop=True)
+    cols = POOL_COLUMNS + [c for c in OPTIONAL_COLUMNS if c in pools.columns]
+    df = pools[cols].sort_values(["user_id", "rank"]).reset_index(drop=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path, index=False)
     digest = sha256_file(path)

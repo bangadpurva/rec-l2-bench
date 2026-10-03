@@ -58,6 +58,7 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | CLM | **Stub**: needs clm-serve API |
 | Data loading, profiles, item text | Done, tested on synthetic files in the real format |
 | L1 embed, exact + HNSW, gate, freeze | Done, tested with a fake encoder |
+| L1 channels: co-occurrence, popularity, interleaved merge | Done, tested (incl. no future data) |
 | Baselines: L1 order, random, popularity (90 d), oracle | Done, tested |
 | Scoring + results report (paired bootstrap, Holm) | Done, tested end to end |
 | SASRec, tabular baseline | Not started |
@@ -69,13 +70,19 @@ pip install -e ".[models,dev]"
 bash scripts/download_data.sh                          # ~4 files into data/raw/
 python scripts/prepare_data.py                         # 100 valid / 500 test users (one-day sizes)
 python scripts/run_l1.py --tune-half-life 30,90,180,365    # validation Recall@100 per half-life
-python scripts/run_l1.py --half-life <best> --index hnsw   # dry run: gate + diagnostics, nothing frozen
-python scripts/run_l1.py --half-life <best> --index hnsw --freeze   # irreversible
+python scripts/run_l1.py --half-life <best> --compare-channels   # recall per channel and merged pool
+python scripts/run_l1.py --half-life <best> --index hnsw --channels dense,cooc,pop            # dry run
+python scripts/run_l1.py --half-life <best> --index hnsw --channels dense,cooc,pop --freeze   # irreversible
 ```
 
 Read `data/pools/l1_report.json` before any L2 work: Recall@50/100/200, ANN overlap,
 and `max_reachable_share` (positives that are neither already-seen nor first seen after
-query time). Recall can never exceed that ceiling.
+query time). Recall can never exceed that ceiling. `users_with_pos@100` is the share of
+users whose pool contains any positive; users without one score 0 under every reranker.
+
+Dense-only L1 on Video_Games gave test Recall@100 = 2.9% against a 68% reachable ceiling,
+so pools merge three channels (dense, item co-occurrence, 90-day popularity). Every model
+still scores the same frozen pool, and each pool row records its `source` channel.
 
 ## Scoring and the results table
 
