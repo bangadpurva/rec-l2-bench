@@ -91,6 +91,8 @@ def main(argv=None):
     ap.add_argument("--configs", default="configs")
     ap.add_argument("--runs-dir", default="runs")
     ap.add_argument("--budget-tokens", type=int, default=512)
+    ap.add_argument("--cohort", default="conditional", choices=["conditional", "all"],
+                    help="conditional (pre-registered primary): users with >=1 positive in frozen top-100")
     a = ap.parse_args(argv)
 
     proc = Path(a.proc)
@@ -103,6 +105,11 @@ def main(argv=None):
     items = pd.read_parquet(proc / "items.parquet")
     text = dict(zip(items.parent_asin, items.text))
 
+    n_full = pools.user_id.nunique()
+    cohort_sha = None
+    if a.cohort == "conditional":
+        keep, cohort_sha = P.load_eval_cohort(Path(a.pools_dir) / f"eval_users_{a.split}.parquet")
+        pools = pools[pools.user_id.isin(set(keep))]
     users = sorted(pools.user_id.unique())
     if a.limit_users:
         users = users[:a.limit_users]
@@ -112,7 +119,7 @@ def main(argv=None):
     started = datetime.now(timezone.utc)
     per_user, scores, totals = run(reranker, pools, profiles, text, pos)
 
-    run_id = f"{started:%Y%m%dT%H%M%S}_{a.track}_{a.model}_{a.split}_m{a.top_m}" + \
+    run_id = f"{started:%Y%m%dT%H%M%S}_{a.track}_{a.model}_{a.split}_{a.cohort}_m{a.top_m}" + \
              (f"_n{a.limit_users}" if a.limit_users else "")
     out = Path(a.runs_dir) / run_id
     m = RunManifest(run_id=run_id, track=a.track, model=a.model,
@@ -122,9 +129,11 @@ def main(argv=None):
                     truncated_pairs=int(getattr(reranker, "truncated_pairs", 0)),
                     retries=totals["retries"], failures=totals["failures"],
                     started_at=started.isoformat(),
-                    model_versions_seen=sorted(totals["versions"]))
+                    model_versions_seen=sorted(totals["versions"]),
+                    eval_cohort=a.cohort, eval_cohort_sha256=cohort_sha,
+                    n_users_scored=len(per_user), n_users_full_cohort=n_full)
     m.write(a.runs_dir)
-    per_user.assign(split=a.split, top_m=a.top_m, limit_users=a.limit_users or 0
+    per_user.assign(split=a.split, top_m=a.top_m, limit_users=a.limit_users or 0, cohort=a.cohort
                     ).to_parquet(out / "per_user.parquet", index=False)
     scores.to_parquet(out / "scores.parquet", index=False)
     if hasattr(getattr(reranker, "backend", None), "usage_input_tokens"):

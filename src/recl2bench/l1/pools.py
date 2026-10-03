@@ -45,3 +45,32 @@ def load(path: str | Path, top_m: int | None = None) -> tuple[pd.DataFrame, str]
     if top_m is not None:
         df = df[df["rank"] < top_m].reset_index(drop=True)
     return df, actual
+
+
+EVAL_TOP_M = 100   # pre-registered: a user is in the eval cohort if top-100 holds a positive
+
+
+def freeze_eval_cohort(pools: pd.DataFrame, positives: dict[str, set], path: str | Path,
+                       top_m: int = EVAL_TOP_M, overwrite: bool = False) -> tuple[str, int, int]:
+    """Users whose frozen top-`top_m` pool contains >= 1 positive. Depends only on
+    L1 and labels, so it is identical for every reranker. Returns (sha, n_eval, n_all)."""
+    path = Path(path)
+    if path.exists() and not overwrite:
+        raise FileExistsError(f"{path} is frozen; refusing to overwrite")
+    top = pools[pools["rank"] < top_m]
+    users = sorted(pools.user_id.unique())
+    got = top.groupby("user_id")["parent_asin"].apply(set).to_dict()
+    keep = [u for u in users if positives.get(u, set()) & got.get(u, set())]
+    pd.DataFrame({"user_id": keep}).to_parquet(path, index=False)
+    digest = sha256_file(path)
+    path.with_suffix(path.suffix + ".sha256").write_text(f"{digest}  {path.name}\n")
+    return digest, len(keep), len(users)
+
+
+def load_eval_cohort(path: str | Path) -> tuple[list[str], str]:
+    path = Path(path)
+    expected = path.with_suffix(path.suffix + ".sha256").read_text().split()[0]
+    actual = sha256_file(path)
+    if actual != expected:
+        raise RuntimeError(f"eval cohort hash mismatch for {path}")
+    return pd.read_parquet(path).user_id.tolist(), actual

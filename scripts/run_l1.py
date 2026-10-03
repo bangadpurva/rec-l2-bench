@@ -178,8 +178,13 @@ def main(argv=None):
             raise SystemExit(f"leakage audit failed for {split}: {errs}")
         if split == "valid" and info.get("gate_passed") is False:
             raise SystemExit(f"ANN gate failed: overlap@100={info['ann_overlap@100']:.3f}")
+        top = pools[pools["rank"] < P.EVAL_TOP_M].groupby("user_id")["parent_asin"].apply(set)
+        info["eval_cohort_users"] = int(sum(bool(ctx.pos[u] & top.get(u, set())) for u in ctx.users))
         if a.freeze:
             info["pool_sha256"] = P.freeze(pools, Path(a.pools_dir) / f"pools_{split}.parquet")
+            sha, n_eval, n_all = P.freeze_eval_cohort(
+                pools, ctx.pos, Path(a.pools_dir) / f"eval_users_{split}.parquet")
+            info.update({"eval_cohort_sha256": sha, "eval_cohort_users": n_eval, "cohort_users": n_all})
         reports["splits"][split] = info
     out = Path(a.pools_dir if a.freeze else proc) / "l1_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)

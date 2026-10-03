@@ -28,14 +28,19 @@ def load_runs(runs_dir: str | Path) -> list[dict]:
 
 
 def build_report(runs: list[dict], split: str = "test", top_m: int = 100,
-                 n_resamples: int = 10_000, seed: int = 0) -> tuple[pd.DataFrame, str]:
+                 n_resamples: int = 10_000, seed: int = 0,
+                 cohort: str = "conditional") -> tuple[pd.DataFrame, str]:
     sel = [r for r in runs if (r["per_user"]["split"].iloc[0] == split
-                               and int(r["per_user"]["top_m"].iloc[0]) == top_m)]
+                               and int(r["per_user"]["top_m"].iloc[0]) == top_m
+                               and r["manifest"].get("eval_cohort", "all") == cohort)]
     if not sel:
-        raise ValueError(f"no runs for split={split} top_m={top_m}")
+        raise ValueError(f"no runs for split={split} top_m={top_m} cohort={cohort}")
     hashes = {r["manifest"]["pool_sha256"] for r in sel}
     if len(hashes) != 1:
         raise ValueError(f"runs use different pools: {hashes}")
+    chashes = {r["manifest"].get("eval_cohort_sha256") for r in sel}
+    if len(chashes) != 1:
+        raise ValueError(f"runs use different eval cohorts: {chashes}")
     # latest run per model wins; partial (limited-user) runs are excluded
     by_model = {}
     for r in sorted(sel, key=lambda r: r["manifest"]["started_at"]):
@@ -62,8 +67,11 @@ def build_report(runs: list[dict], split: str = "test", top_m: int = 100,
     rows = []
     for m, a in aligned.items():
         mf = by_model[m]["manifest"]
+        n_full = mf.get("n_users_full_cohort") or len(users)
         row = {"model": m, "version": mf.get("model_version"), "mode": mf.get("scoring_mode"),
                **{c: a[c].mean() for c in METRIC_COLS},
+               # users outside the conditional cohort score 0 under every model, so this is exact
+               "ndcg@10_all_users": a["ndcg@10"].sum() / n_full,
                "latency_p50_s": a.latency_s.quantile(.5), "latency_p95_s": a.latency_s.quantile(.95),
                "failures": mf["failures"], "retries": mf["retries"]}
         s = stats.get(m)
@@ -74,11 +82,14 @@ def build_report(runs: list[dict], split: str = "test", top_m: int = 100,
     table = pd.DataFrame(rows).sort_values("ndcg@10", ascending=False).reset_index(drop=True)
 
     pool = hashes.pop()
-    lines = [f"# Results: {split}, top-{top_m}, {len(users)} users",
+    n_full = by_model["l1_order"]["manifest"].get("n_users_full_cohort") or len(users)
+    scope = (f"{len(users)} of {n_full} users (pool top-{top_m} holds >= 1 positive)"
+             if cohort == "conditional" else f"all {len(users)} users")
+    lines = [f"# Results: {split}, top-{top_m}, {scope}",
              "", f"Pool sha256: `{pool[:16]}…`  ·  primary metric: NDCG@10  ·  "
              f"paired bootstrap ({n_resamples:,} resamples) vs L1 order, Holm-corrected", "",
-             "| Model | NDCG@10 | Δ vs L1 [CI] | p (Holm) | Beats L1 | NDCG@30 | P@10 | R@10 | R@30 | HR@10 | p50 / p95 s |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| Model | NDCG@10 | Δ vs L1 [CI] | p (Holm) | Beats L1 | NDCG@10 all users | NDCG@30 | P@10 | R@10 | R@30 | HR@10 | p50 / p95 s |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for _, t in table.iterrows():
         dv = t.get("d_ndcg@10_vs_l1", np.nan)
         if pd.notna(dv):
@@ -88,6 +99,7 @@ def build_report(runs: list[dict], split: str = "test", top_m: int = 100,
         else:
             dcell = pcell = bcell = "—"
         lines.append(f"| {t.model} | {t['ndcg@10']:.4f} | {dcell} | {pcell} | {bcell} | "
+                     f"{t['ndcg@10_all_users']:.4f} | "
                      f"{t['ndcg@30']:.4f} | {t['precision@10']:.4f} | {t['recall@10']:.4f} | "
                      f"{t['recall@30']:.4f} | {t['hit_rate@10']:.4f} | "
                      f"{t.latency_p50_s:.3f} / {t.latency_p95_s:.3f} |")

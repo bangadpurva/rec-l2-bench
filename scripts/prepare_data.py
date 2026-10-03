@@ -1,6 +1,6 @@
 """Step 1: cohorts, positives, item text and profiles for valid and test.
 
-    python scripts/prepare_data.py                       # one-day sizes from dataset.yaml
+    python scripts/prepare_data.py                       # 2,000 valid / 3,000 test (Amendment 1)
     python scripts/prepare_data.py --n-valid 200 --n-test 2000
 """
 from __future__ import annotations
@@ -33,7 +33,8 @@ def main(argv=None):
 
     cfg = yaml.safe_load(Path(a.config).read_text())
     co, lab, prof, bud = cfg["cohort"], cfg["label"], cfg["profile"], cfg["budget"]
-    n = {"valid": a.n_valid or co["one_day_valid_users"], "test": a.n_test or co["one_day_test_users"]}
+    n = {"valid": a.n_valid or co.get("valid_users", co["one_day_valid_users"]),
+         "test": a.n_test or co.get("test_users", co["one_day_test_users"])}
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     tok = get_tokenizer(a.tokenizer or bud["tokenizer"])

@@ -18,6 +18,8 @@ cohort:
   pilot_valid_users: 200
   one_day_test_users: 500
   one_day_valid_users: 100
+  valid_users: 2000            # Amendment 1 (PREREGISTRATION.md)
+  test_users: 3000             # Amendment 1
   full_users_per_split: 2000
 
 label:

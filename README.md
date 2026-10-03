@@ -4,8 +4,9 @@ L2 reranker benchmark: cross-encoder rerankers (Qwen3-Reranker-0.6B, bge-reranke
 vs decision models (Jev, Clef, CLM, OpenAI Decisions) on one frozen L1 candidate pool
 from Amazon Reviews'23 Video_Games (5-core, timestamp split).
 
-Primary metric (pre-registered): **NDCG@10 on the test cohort**, paired bootstrap vs
-ANN-only with Holm correction.
+Primary metric (pre-registered, see `PREREGISTRATION.md`): **NDCG@10 on the conditional
+test cohort** (users whose frozen top-100 pool holds a positive), paired bootstrap vs L1
+order with Holm correction. All-user NDCG@10 is reported as secondary.
 
 ## Setup
 
@@ -68,7 +69,7 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 ```bash
 pip install -e ".[models,dev]"
 bash scripts/download_data.sh                          # ~4 files into data/raw/
-python scripts/prepare_data.py                         # 100 valid / 500 test users (one-day sizes)
+python scripts/prepare_data.py                         # 2,000 valid / 3,000 test users
 python scripts/run_l1.py --tune-half-life 30,90,180,365    # validation Recall@100 per half-life
 python scripts/run_l1.py --half-life <best> --compare-channels   # recall per channel and merged pool
 python scripts/run_l1.py --half-life <best> --index hnsw --channels dense,cooc,pop            # dry run

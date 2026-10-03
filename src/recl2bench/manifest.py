@@ -29,6 +29,10 @@ class RunManifest:
     failures: int = 0
     started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     model_versions_seen: list[str] = field(default_factory=list)
+    eval_cohort: str = "conditional"          # conditional | all
+    eval_cohort_sha256: str | None = None
+    n_users_scored: int = 0
+    n_users_full_cohort: int = 0
 
     def write(self, runs_dir: str | Path = "runs") -> Path:
         d = Path(runs_dir) / self.run_id

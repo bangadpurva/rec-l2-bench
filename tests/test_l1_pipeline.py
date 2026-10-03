@@ -135,3 +135,36 @@ def test_compare_and_freeze_merged_channels(raw):
     assert not pools.duplicated(["user_id", "parent_asin"]).any()
     rep = json.loads((pools_dir / "l1_report.json").read_text())["splits"]["test"]
     assert "users_with_pos@100" in rep and "channel_cooc" in rep
+
+
+def test_conditional_cohort_matches_all_users(raw):
+    import report
+    import score
+    proc, pools_dir, runs = raw / "processed", raw / "pools", raw / "runs"
+    prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
+                       "--out", str(proc), "--n-valid", "30", "--n-test", "80",
+                       "--tokenizer", "whitespace"])
+    run_l1.main(["--dataset-config", str(ROOT / "configs/dataset.yaml"),
+                 "--l1-config", str(ROOT / "configs/l1.yaml"), "--raw", str(raw / "raw"),
+                 "--proc", str(proc), "--pools-dir", str(pools_dir), "--encoder", "fake",
+                 "--index", "exact", "--channels", "dense,cooc,pop", "--freeze"])
+    rep = json.loads((pools_dir / "l1_report.json").read_text())["splits"]["test"]
+    keep, _ = P.load_eval_cohort(pools_dir / "eval_users_test.parquet")
+    assert len(keep) == rep["eval_cohort_users"] and 0 < len(keep) < 80
+
+    common = ["--split", "test", "--raw", str(raw / "raw"), "--proc", str(proc),
+              "--pools-dir", str(pools_dir), "--configs", str(ROOT / "configs"), "--runs-dir", str(runs)]
+    for m in ("l1_order", "popularity"):
+        cond = score.main(common + ["--model", m])
+        full = score.main(common + ["--model", m, "--cohort", "all"])
+        pc, pf = pd.read_parquet(cond / "per_user.parquet"), pd.read_parquet(full / "per_user.parquet")
+        assert set(pc.user_id) == set(keep)
+        # users outside the cohort score exactly 0
+        assert (pf[~pf.user_id.isin(keep)]["ndcg@10"] == 0).all()
+        assert pc["ndcg@10"].sum() / len(pf) == pytest.approx(pf["ndcg@10"].mean())
+    stem = report.main(["--split", "test", "--runs-dir", str(runs), "--out", str(raw / "results"),
+                        "--resamples", "300"])
+    t = pd.read_csv(stem.with_suffix(".csv")).set_index("model")
+    full_mean = pd.read_parquet(full / "per_user.parquet")["ndcg@10"].mean()
+    assert t.loc["popularity", "ndcg@10_all_users"] == pytest.approx(full_mean)
+    assert "conditional" in stem.name

@@ -19,11 +19,12 @@ def main(argv=None):
     ap.add_argument("--runs-dir", default="runs")
     ap.add_argument("--out", default="results")
     ap.add_argument("--resamples", type=int, default=10_000)
+    ap.add_argument("--cohort", default="conditional", choices=["conditional", "all"])
     a = ap.parse_args(argv)
-    table, md = build_report(load_runs(a.runs_dir), a.split, a.top_m, a.resamples)
+    table, md = build_report(load_runs(a.runs_dir), a.split, a.top_m, a.resamples, cohort=a.cohort)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    stem = out / f"{a.split}_m{a.top_m}"
+    stem = out / f"{a.split}_{a.cohort}_m{a.top_m}"
     table.to_csv(stem.with_suffix(".csv"), index=False)
     stem.with_suffix(".md").write_text(md)
     print(md)
