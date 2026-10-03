@@ -5,6 +5,7 @@
 #
 # Settings come from environment variables (defaults in brackets):
 #   CAT       category, e.g. Musical_Instruments        [category in configs/dataset.yaml]
+#   SPLIT     split scored by baselines/bge/qwen3/clef/report/diagnose: test | valid [test]
 #   HL        L1 recency half-life in days              [180]
 #   CHANNELS  L1 channels, comma list of dense,cooc,pop [dense,pop]
 #   INDEX     dense index: exact | hnsw                 [hnsw]
@@ -55,13 +56,14 @@ L1=(--raw "$D/raw" --proc "$D/processed" --pools-dir "$D/pools" --category "$CAT
 
 COMMON=(--raw "$D/raw" --proc "$D/processed" --pools-dir "$D/pools"
         --runs-dir "$RUNS" --category "$CAT" --hardware "$HW")
-SCORE=(--split test "${COMMON[@]}")
+SPLIT="${SPLIT:-test}"
+SCORE=(--split "$SPLIT" "${COMMON[@]}")
 SCORE_VALID=(--split valid "${COMMON[@]}")
 # Extra args for tests or overrides, e.g. PREP_ARGS="--n-test 1000"
 read -r -a PREP_EXTRA <<< "${PREP_ARGS:-}"
 read -r -a L1_EXTRA <<< "${L1_ARGS:-}"
 
-echo "stage=$STAGE CAT=$CAT HL=$HL CHANNELS=$CHANNELS INDEX=$INDEX log=$LOG" | tee -a "$LOG"
+echo "stage=$STAGE CAT=$CAT SPLIT=${SPLIT:-test} HL=$HL CHANNELS=$CHANNELS INDEX=$INDEX log=$LOG" | tee -a "$LOG"
 case "$STAGE" in
   check)
     run nvidia-smi || true
@@ -96,9 +98,9 @@ case "$STAGE" in
     : "${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}" "${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID in .env}"
     run python scripts/score.py "${SCORE[@]}" --model clef ;;
   diagnose)
-    run python scripts/diagnose_runs.py --category "$CAT" ;;
+    run python scripts/diagnose_runs.py --category "$CAT" --split "$SPLIT" ;;
   report)
-    run python scripts/report.py --split test --runs-dir "$RUNS" --out "$RES" ;;
+    run python scripts/report.py --split "$SPLIT" --runs-dir "$RUNS" --out "$RES" ;;
   *)
     echo "unknown stage: $STAGE"; sed -n '2,30p' "$0"; exit 1 ;;
 esac

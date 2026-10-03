@@ -215,6 +215,10 @@ def test_run_pipeline_stages_end_to_end(raw, tmp_path):
     assert list((repo / "results" / cat).glob("test_conditional_m100.md"))
     assert list((repo / "backups").glob(f"{cat}_*.tar.gz"))
     assert len(list((repo / "logs").glob("*.log"))) == 7
+    env["SPLIT"] = "valid"
+    for s_ in ("baselines", "report"):
+        stage(s_)
+    assert list((repo / "results" / cat).glob("valid_conditional_m100.md"))
     d = pd.read_csv(repo / "results" / cat / "diagnose_test.csv").set_index("model")
     assert "random" in d.index and abs(d.filter(like="top10_share").sum(axis=1) - 1).max() < 1e-9
     # freeze is irreversible: a second freeze must fail
