@@ -126,6 +126,7 @@ def main(argv=None):
     ap.add_argument("--index", choices=["exact", "hnsw"])
     ap.add_argument("--freeze", action="store_true", help="write and hash pools (irreversible)")
     ap.add_argument("--encoder", default=None, help="override; 'fake' for tests")
+    ap.add_argument("--category", help="override dataset.yaml category")
     a = ap.parse_args(argv)
 
     dcfg = yaml.safe_load(Path(a.dataset_config).read_text())
@@ -136,7 +137,7 @@ def main(argv=None):
     chans = [c.strip() for c in a.channels.split(",")]
     assert all(c in CHANNELS for c in chans), chans
 
-    ratings = load_ratings(a.raw, dcfg["category"])
+    ratings = load_ratings(a.raw, a.category or dcfg["category"])
     items = pd.read_parquet(proc / "items.parquet")
     fs = items.set_index("parent_asin")["first_seen"]
     item_index = {x: i for i, x in enumerate(items.parent_asin)}
@@ -168,7 +169,7 @@ def main(argv=None):
             t.to_csv(proc / f"l1_channels_{split}.csv", index=False)
         return
 
-    reports = {"encoder": enc.name, "embedding_cache_key": emb_key, "index": index_kind,
+    reports = {"category": a.category or dcfg["category"], "encoder": enc.name, "embedding_cache_key": emb_key, "index": index_kind,
                "channels": chans, "splits": {}}
     for split in ("valid", "test"):
         ctx = Ctx(split, ratings, items, V, item_index, fs, proc, hl, m)

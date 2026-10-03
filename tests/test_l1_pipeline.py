@@ -182,3 +182,39 @@ def test_screen_categories_runs_on_validation(raw):
     row = t.loc["Video_Games"]
     assert row.cut_points == "ok" and row.sampled_valid_users == 60
     assert 0 <= row["cooc+pop_users_with_pos@100"] <= 1 and 0 <= row.unreachable_share <= 1
+
+
+def test_run_pipeline_stages_end_to_end(raw, tmp_path):
+    """Drive the real bash pipeline on synthetic data in a copy of the repo."""
+    import shutil
+    import subprocess
+    repo = tmp_path / "repo"
+    top = {".git", "data", "runs", "results", "logs", "backups", ".hf_cache", ".venv"}
+
+    def ignore(d, names):
+        skip = {"__pycache__", ".pytest_cache"}
+        if Path(d) == ROOT:
+            skip |= top
+        return [n for n in names if n in skip]
+    shutil.copytree(ROOT, repo, ignore=ignore)
+    cat = "Video_Games"
+    shutil.copytree(raw / "raw", repo / "data" / cat / "raw")
+    env = {**__import__("os").environ, "CAT": cat, "FORCE": "1", "INDEX": "exact",
+           "PREP_ARGS": "--n-valid 30 --n-test 80 --tokenizer whitespace", "L1_ARGS": "--encoder fake"}
+
+    def stage(name):
+        p = subprocess.run(["bash", "scripts/run_pipeline.sh", name], cwd=repo, env=env,
+                           capture_output=True, text=True)
+        assert p.returncode == 0, f"{name} failed:\n{p.stdout[-2000:]}\n{p.stderr[-2000:]}"
+        return p.stdout
+
+    for s in ("data", "l1-dryrun", "l1-freeze", "baselines", "report", "backup"):
+        out = stage(s)
+    assert (repo / "data" / cat / "pools" / "eval_users_test.parquet").exists()
+    assert list((repo / "results" / cat).glob("test_conditional_m100.md"))
+    assert list((repo / "backups").glob(f"{cat}_*.tar.gz"))
+    assert len(list((repo / "logs").glob("*.log"))) == 6
+    # freeze is irreversible: a second freeze must fail
+    p = subprocess.run(["bash", "scripts/run_pipeline.sh", "l1-freeze"], cwd=repo, env=env,
+                       capture_output=True, text=True)
+    assert p.returncode != 0

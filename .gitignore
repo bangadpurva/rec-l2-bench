@@ -17,3 +17,13 @@ runs/*/latency.parquet
 .env
 results/
 data/screen/
+
+# Per-category layout (data/<CAT>/..., runs/<CAT>/...)
+data/*/raw/
+data/*/processed/
+data/*/pools/*.parquet
+runs/**/scores.parquet
+logs/
+backups/
+.hf_cache/
+.venv/

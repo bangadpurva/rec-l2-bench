@@ -53,7 +53,7 @@ def build(model: str, args, positives, cfg_dir: Path):
         return OracleReranker(positives), {}, None, None, None
     if model == "popularity":
         from recl2bench.baselines.simple import PopularityReranker
-        return PopularityReranker(load_ratings(args.raw), 90), {}, None, None, None
+        return PopularityReranker(load_ratings(args.raw, args.category), 90), {}, None, None, None
     if model == "bge":
         from recl2bench.rerankers.cross_encoder import BGEReranker
         c = yaml.safe_load((cfg_dir / "models/bge_reranker.yaml").read_text())
@@ -91,10 +91,13 @@ def main(argv=None):
     ap.add_argument("--configs", default="configs")
     ap.add_argument("--runs-dir", default="runs")
     ap.add_argument("--budget-tokens", type=int, default=512)
+    ap.add_argument("--category", help="override dataset.yaml category (popularity baseline reads ratings)")
     ap.add_argument("--cohort", default="conditional", choices=["conditional", "all"],
                     help="conditional (pre-registered primary): users with >=1 positive in frozen top-100")
     a = ap.parse_args(argv)
 
+    if not a.category:
+        a.category = yaml.safe_load((Path(a.configs) / "dataset.yaml").read_text())["category"]
     proc = Path(a.proc)
     pools, pool_sha = P.load(Path(a.pools_dir) / f"pools_{a.split}.parquet", top_m=a.top_m)
     prof = pd.read_parquet(proc / f"profiles_{a.split}.parquet")

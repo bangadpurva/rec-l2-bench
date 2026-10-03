@@ -29,9 +29,11 @@ def main(argv=None):
     ap.add_argument("--n-valid", type=int)
     ap.add_argument("--n-test", type=int)
     ap.add_argument("--tokenizer", help="override budget tokenizer ('whitespace' for tests)")
+    ap.add_argument("--category", help="override dataset.yaml category, e.g. Musical_Instruments")
     a = ap.parse_args(argv)
 
     cfg = yaml.safe_load(Path(a.config).read_text())
+    cat = a.category or cfg["category"]
     co, lab, prof, bud = cfg["cohort"], cfg["label"], cfg["profile"], cfg["budget"]
     n = {"valid": a.n_valid or co.get("valid_users", co["one_day_valid_users"]),
          "test": a.n_test or co.get("test_users", co["one_day_test_users"])}
@@ -39,16 +41,16 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     tok = get_tokenizer(a.tokenizer or bud["tokenizer"])
 
-    ratings = load_ratings(a.raw, cfg["category"])
+    ratings = load_ratings(a.raw, cat)
     fs = first_seen(ratings)
-    meta = load_meta(a.raw, set(ratings.parent_asin.unique()), cfg["category"])
+    meta = load_meta(a.raw, set(ratings.parent_asin.unique()), cat)
     missing_meta = len(set(ratings.parent_asin) - set(meta.parent_asin))
     items = build_items(meta, tok, bud["item_tokens"], fs)
     errs = LA.check_item_fields(items)
     assert not errs, errs
     items.to_parquet(out / "items.parquet", index=False)
 
-    report = {"n_ratings": len(ratings), "n_users": ratings.user_id.nunique(),
+    report = {"category": cat, "n_ratings": len(ratings), "n_users": ratings.user_id.nunique(),
               "n_items": len(items), "items_missing_meta": missing_meta,
               "items_truncated": int(items.truncated.sum()), "splits": {}}
     for split in ("valid", "test"):

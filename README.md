@@ -2,13 +2,20 @@
 
 L2 reranker benchmark: cross-encoder rerankers (Qwen3-Reranker-0.6B, bge-reranker-v2-m3)
 vs decision models (Jev, Clef, CLM, OpenAI Decisions) on one frozen L1 candidate pool
-from Amazon Reviews'23 Video_Games (5-core, timestamp split).
+from Amazon Reviews'23 (5-core, timestamp split). The category is chosen by a
+validation-only screen (`scripts/screen_categories.py`); Video_Games was dropped after
+its L1 diagnostics.
 
 Primary metric (pre-registered, see `PREREGISTRATION.md`): **NDCG@10 on the conditional
 test cohort** (users whose frozen top-100 pool holds a positive), paired bootstrap vs L1
 order with Holm correction. All-user NDCG@10 is reported as secondary.
 
-## Setup
+## Running it
+
+**On Vast.ai (or any Linux GPU box): follow [`VASTAI.md`](VASTAI.md).** One setup script,
+then `bash scripts/run_pipeline.sh <stage>` for each stage, with logs and backups.
+
+## Setup (manual)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
