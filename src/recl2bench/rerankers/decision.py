@@ -113,7 +113,7 @@ class ClefBackend(Backend):
         status, data = self.transport(self.url, {"Authorization": f"Bearer {self.token}",
                                                  "Content-Type": "application/json"}, body)
         if status in (429, 529) or status >= 500:
-            raise RetryableError(f"HTTP {status}")
+            raise RetryableError(f"HTTP {status}: {str(data)[:300]}")
         if status != 200:
             raise RuntimeError(f"Clef HTTP {status}: {data}")
         data = data.get("result", data)
