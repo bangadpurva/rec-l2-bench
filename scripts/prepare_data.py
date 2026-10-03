@@ -39,7 +39,7 @@ def main(argv=None):
          "test": a.n_test or co.get("test_users", co["one_day_test_users"])}
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    tok = get_tokenizer(a.tokenizer or bud["tokenizer"])
+    tok = get_tokenizer(a.tokenizer or bud["tokenizer"], None if a.tokenizer else bud.get("tokenizer_revision"))
 
     ratings = load_ratings(a.raw, cat)
     fs = first_seen(ratings)

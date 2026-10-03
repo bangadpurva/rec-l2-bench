@@ -1,7 +1,7 @@
 name: bge_reranker
 family: cross_encoder
 hf_model: BAAI/bge-reranker-v2-m3
-revision: null            # TODO: pin commit hash
+revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e   # HF main as of 2024-06-24
 score: sigmoid_logit
 template: null            # no instruction slot
 batch_size: 32

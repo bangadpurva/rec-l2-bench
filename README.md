@@ -108,6 +108,5 @@ python scripts/report.py --split test     # -> results/test_m100.md and .csv
 
 ## Before the first L2 run
 
-- Pin every `revision: null` in `configs/` to a commit hash.
 - Make one live Clef Flash call and confirm the response shape matches `ClefBackend`.
 - Implement `Backend.ask` for Jev from the TypeSafe API reference.
