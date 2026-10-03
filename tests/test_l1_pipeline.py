@@ -209,12 +209,14 @@ def test_run_pipeline_stages_end_to_end(raw, tmp_path):
         assert p.returncode == 0, f"{name} failed:\n{p.stdout[-2000:]}\n{p.stderr[-2000:]}"
         return p.stdout
 
-    for s in ("data", "l1-dryrun", "l1-freeze", "baselines", "report", "backup"):
+    for s in ("data", "l1-dryrun", "l1-freeze", "baselines", "report", "diagnose", "backup"):
         out = stage(s)
     assert (repo / "data" / cat / "pools" / "eval_users_test.parquet").exists()
     assert list((repo / "results" / cat).glob("test_conditional_m100.md"))
     assert list((repo / "backups").glob(f"{cat}_*.tar.gz"))
-    assert len(list((repo / "logs").glob("*.log"))) == 6
+    assert len(list((repo / "logs").glob("*.log"))) == 7
+    d = pd.read_csv(repo / "results" / cat / "diagnose_test.csv").set_index("model")
+    assert "random" in d.index and abs(d.filter(like="top10_share").sum(axis=1) - 1).max() < 1e-9
     # freeze is irreversible: a second freeze must fail
     p = subprocess.run(["bash", "scripts/run_pipeline.sh", "l1-freeze"], cwd=repo, env=env,
                        capture_output=True, text=True)
