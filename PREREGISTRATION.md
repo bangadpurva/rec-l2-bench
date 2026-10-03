@@ -40,9 +40,11 @@ The decision rule (paired bootstrap, Holm, vs L1 order) is unchanged.
 
 **Category.** Video_Games is dropped. Four candidate categories were screened on
 **validation only** (2,000 users each, popularity and co-occurrence L1, no embeddings;
-`scripts/screen_categories.py`). Musical_Instruments had the lowest unreachable share
-(9% of validation positives first seen after the query time) and the highest share of
-users with a positive in a top-100 pool (14.7%), and is the benchmark category. No test
+`scripts/screen_categories.py`). Musical_Instruments is the benchmark category: it had
+the lowest unreachable share by a wide margin (9% of validation positives first seen
+after the query time, vs 17-23% elsewhere) and the second-highest share of users with a
+positive in a top-100 pool (14.7%). Baby_Products was slightly higher on that share
+(15.8%) but nearly twice as many unreachable positives and a weak co-occurrence channel. No test
 metric was computed for any candidate; only eligible test-user counts were read.
 
 | Category | Unreachable | Users with positive @100 (best channel) |

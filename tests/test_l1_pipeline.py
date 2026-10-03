@@ -17,6 +17,7 @@ import prepare_data  # noqa: E402
 import run_l1  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
+CAT = __import__("yaml").safe_load((ROOT / "configs/dataset.yaml").read_text())["category"]
 DAY = 86_400_000
 
 
@@ -41,8 +42,8 @@ def raw(tmp_path):
     for name, part in (("train", df[df.timestamp < VALID_START_MS]),
                        ("valid", df[(df.timestamp >= VALID_START_MS) & (df.timestamp < TEST_START_MS)]),
                        ("test", df[df.timestamp >= TEST_START_MS])):
-        part.to_csv(d / f"Video_Games.{name}.csv.gz", index=False)
-    with gzip.open(d / "meta_Video_Games.jsonl.gz", "wt") as f:
+        part.to_csv(d / f"{CAT}.{name}.csv.gz", index=False)
+    with gzip.open(d / f"meta_{CAT}.jsonl.gz", "wt") as f:
         for i, a in enumerate(items):
             f.write(json.dumps({"parent_asin": a, "title": f"Game {i}", "store": "Nintendo",
                                 "categories": ["Video Games", "Nintendo Switch"], "features": ["fun"],
@@ -173,13 +174,13 @@ def test_conditional_cohort_matches_all_users(raw):
 def test_screen_categories_runs_on_validation(raw):
     import shutil
     import screen_categories
-    d = raw / "screen" / "Video_Games"
+    d = raw / "screen" / CAT
     d.mkdir(parents=True)
     for s in ("train", "valid", "test"):
-        shutil.copy(raw / "raw" / f"Video_Games.{s}.csv.gz", d)
-    t = screen_categories.main(["--categories", "Video_Games", "--raw-root", str(raw / "screen"),
+        shutil.copy(raw / "raw" / f"{CAT}.{s}.csv.gz", d)
+    t = screen_categories.main(["--categories", CAT, "--raw-root", str(raw / "screen"),
                                 "--n-valid", "60", "--chunk", "25", "--no-download"])
-    row = t.loc["Video_Games"]
+    row = t.loc[CAT]
     assert row.cut_points == "ok" and row.sampled_valid_users == 60
     assert 0 <= row["cooc+pop_users_with_pos@100"] <= 1 and 0 <= row.unreachable_share <= 1
 
@@ -197,7 +198,7 @@ def test_run_pipeline_stages_end_to_end(raw, tmp_path):
             skip |= top
         return [n for n in names if n in skip]
     shutil.copytree(ROOT, repo, ignore=ignore)
-    cat = "Video_Games"
+    cat = CAT
     shutil.copytree(raw / "raw", repo / "data" / cat / "raw")
     env = {**__import__("os").environ, "CAT": cat, "FORCE": "1", "INDEX": "exact",
            "PREP_ARGS": "--n-valid 30 --n-test 80 --tokenizer whitespace", "L1_ARGS": "--encoder fake"}
