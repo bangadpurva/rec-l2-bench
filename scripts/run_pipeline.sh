@@ -5,6 +5,7 @@
 #
 # Settings come from environment variables (defaults in brackets):
 #   CAT       category, e.g. Musical_Instruments        [category in configs/dataset.yaml]
+#   CONCURRENCY  parallel API calls for clef (default from configs/models/clef.yaml)
 #   SPLIT     split scored by baselines/bge/qwen3/clef/report/diagnose: test | valid [test]
 #   HL        L1 recency half-life in days              [180]
 #   CHANNELS  L1 channels, comma list of dense,cooc,pop [dense,pop]
@@ -97,7 +98,7 @@ case "$STAGE" in
     run python scripts/score.py "${SCORE_VALID[@]}" --model clef --limit-users 20 ;;
   clef)
     : "${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}" "${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID in .env}"
-    run python scripts/score.py "${SCORE[@]}" --model clef ;;
+    run python scripts/score.py "${SCORE[@]}" --model clef ${CONCURRENCY:+--concurrency "$CONCURRENCY"} ;;
   fuse)
     run python scripts/fuse.py --category "$CAT" ;;
   diagnose)

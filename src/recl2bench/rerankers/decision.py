@@ -158,12 +158,17 @@ def build_state(profile: UserProfile, item: CandidateItem | None = None,
 class DecisionReranker(Reranker):
     def __init__(self, backend: Backend, question: YesNoQuestion,
                  scoring_mode: ScoringMode = "per_pair", concurrency: int = 8,
-                 max_retries: int = 5, shuffle_seed: int | None = None):
+                 max_retries: int = 6, shuffle_seed: int | None = None,
+                 backoff_base: float = 1.0, backoff_cap: float = 30.0, sleep=None):
         if scoring_mode == "listwise":
             raise NotImplementedError("listwise mode is a Track D variant; add after per_pair works")
         self.backend, self.question = backend, question
         self.scoring_mode, self.concurrency = scoring_mode, concurrency
         self.max_retries, self.shuffle_seed = max_retries, shuffle_seed
+        self.backoff_base, self.backoff_cap = backoff_base, backoff_cap
+        import time as _time
+        self._sleep = sleep or _time.sleep
+        self.retry_wait_s = 0.0          # total time spent backing off, reported separately
         self.name = f"{backend.name}:{scoring_mode}"
         self.error_samples: dict[str, int] = {}     # error text -> count, across the run
 
@@ -183,6 +188,10 @@ class DecisionReranker(Reranker):
                 retries += 1
                 if retries > self.max_retries:
                     raise
+                # exponential backoff with full jitter: 429/529 means slow down, not retry now
+                wait = random.uniform(0, min(self.backoff_cap, self.backoff_base * 2 ** (retries - 1)))
+                self.retry_wait_s += wait
+                self._sleep(wait)
 
     def _score(self, user_profile, candidate_items):
         if self.scoring_mode == "per_pair":

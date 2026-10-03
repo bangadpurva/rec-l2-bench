@@ -52,7 +52,7 @@ def test_question_cap():
 
 def test_per_pair_through_adapter_with_retry(profile, candidates):
     be = ClefBackend("acct", "tok", transport=FakeHTTP([429, 529]))
-    res = DecisionReranker(be, Q, "per_pair", concurrency=1).rerank(profile, candidates)
+    res = DecisionReranker(be, Q, "per_pair", concurrency=1, sleep=lambda s: None).rerank(profile, candidates)
     assert res.retries == 2 and res.failures == 0 and res.model_version == "clef-flash"
 
 
@@ -90,3 +90,22 @@ def test_missing_probability_field_is_an_error():
     bad = {"result": {"model": "clef-flash", "answers": {"q0": {"type": "noul"}}}}
     with pytest.raises(ValueError):
         ClefBackend("acct", "tok", transport=lambda u, h, b: (200, bad)).ask("s", [Q])
+
+
+def test_backoff_waits_grow_and_are_capped(profile, candidates):
+    waits = []
+    be = ClefBackend("acct", "tok", transport=FakeHTTP([429] * 5))
+    rr = DecisionReranker(be, Q, "per_pair", concurrency=1, sleep=waits.append,
+                          backoff_base=1.0, backoff_cap=4.0)
+    res = rr.rerank(profile, candidates[:1])
+    assert res.retries == 5 and res.failures == 0 and len(waits) == 5
+    caps = [1, 2, 4, 4, 4]
+    assert all(0 <= w <= c for w, c in zip(waits, caps))
+    assert rr.retry_wait_s == pytest.approx(sum(waits))
+
+
+def test_gives_up_after_max_retries(profile, candidates):
+    be = ClefBackend("acct", "tok", transport=FakeHTTP([429] * 10))
+    rr = DecisionReranker(be, Q, "per_pair", concurrency=1, max_retries=2, sleep=lambda s: None)
+    res = rr.rerank(profile, candidates[:1])
+    assert res.failures == 1 and "RetryableError" in next(iter(rr.error_samples))

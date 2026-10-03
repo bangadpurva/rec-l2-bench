@@ -71,7 +71,8 @@ def build(model: str, args, positives, cfg_dir: Path):
         q, sha = load_template(tpath)
         mode = args.scoring_mode or c["scoring_mode"]
         be = make_backend("clef", **c)
-        return DecisionReranker(be, q, mode, concurrency=c["concurrency"]), c, sha, mode, c["concurrency"]
+        conc = getattr(args, "concurrency", None) or c["concurrency"]
+        return DecisionReranker(be, q, mode, concurrency=conc), c, sha, mode, conc
     raise ValueError(model)
 
 
@@ -82,6 +83,7 @@ def main(argv=None):
     ap.add_argument("--top-m", type=int, default=100, help="prefix of the frozen 200")
     ap.add_argument("--limit-users", type=int, help="smoke test on the first N users")
     ap.add_argument("--scoring-mode", choices=["per_pair", "fan_out"])
+    ap.add_argument("--concurrency", type=int, help="override the model config (API models)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--track", default="A")
     ap.add_argument("--hardware", default=platform.platform())
@@ -137,7 +139,9 @@ def main(argv=None):
                     started_at=started.isoformat(),
                     model_versions_seen=sorted(totals["versions"]),
                     eval_cohort=a.cohort, eval_cohort_sha256=cohort_sha,
-                    n_users_scored=len(per_user), n_users_full_cohort=n_full)
+                    n_users_scored=len(per_user), n_users_full_cohort=n_full,
+                    input_tokens=getattr(getattr(reranker, "backend", None), "usage_input_tokens", None),
+                    retry_wait_s=getattr(reranker, "retry_wait_s", None))
     m.write(a.runs_dir)
     per_user.assign(split=a.split, top_m=a.top_m, limit_users=a.limit_users or 0, cohort=a.cohort
                     ).to_parquet(out / "per_user.parquet", index=False)
@@ -149,7 +153,9 @@ def main(argv=None):
             print(f"  {v}: {k}")
         (out / "errors.json").write_text(__import__("json").dumps(errs, indent=2))
     if hasattr(getattr(reranker, "backend", None), "usage_input_tokens"):
-        print(f"input tokens billed: {reranker.backend.usage_input_tokens:,}")
+        print(f"input tokens billed: {reranker.backend.usage_input_tokens:,}  "
+              f"(~${reranker.backend.usage_input_tokens * 0.24 / 1e6:.2f} at $0.24/M); "
+              f"backoff waits: {reranker.retry_wait_s:.1f}s")
     print(f"{run_id}: users={len(per_user)} ndcg@10={per_user['ndcg@10'].mean():.4f} "
           f"failures={totals['failures']} retries={totals['retries']} "
           f"p50/p95 latency={per_user.latency_s.quantile(.5):.3f}/{per_user.latency_s.quantile(.95):.3f}s")

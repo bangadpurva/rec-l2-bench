@@ -63,7 +63,7 @@ class FakeBackend(Backend):
 
 
 def test_decision_per_pair_counts_retries_and_failures(profile, candidates):
-    rr = DecisionReranker(FakeBackend(), Q, "per_pair", concurrency=1)
+    rr = DecisionReranker(FakeBackend(), Q, "per_pair", concurrency=1, sleep=lambda s: None)
     res = rr.rerank(profile, candidates)
     assert res.retries == 1 and res.failures == 1
     assert rr.error_samples == {"RuntimeError: boom": 1}
@@ -73,7 +73,7 @@ def test_decision_per_pair_counts_retries_and_failures(profile, candidates):
 
 def test_decision_fan_out_chunks_by_max_questions(profile, candidates):
     be = FakeBackend()
-    res = DecisionReranker(be, Q, "fan_out").rerank(profile, candidates)
+    res = DecisionReranker(be, Q, "fan_out", sleep=lambda s: None).rerank(profile, candidates)
     assert be.calls == 1 + 3          # one 429 retry + ceil(5/2) requests
     assert res.failures == 0 and not any(math.isnan(s) for s in res.scores)
 

@@ -118,3 +118,19 @@ cohort with that w. The grid is saved to `results/<CAT>/fusion_tuning.csv`.
 
 Fusion runs enter the same report and Holm family as Track A (four extra comparisons),
 which makes every adjusted p-value more conservative.
+
+## Amendment 5 (2026-10-03): Clef Flash, fixed before any Clef test run
+
+Only a 20-user **validation** smoke test of Clef had been run (NDCG@10 not used).
+
+- **Model and mode:** `@cf/cloudflare/clef-flash`, per-pair scoring (one yes/no `noul`
+  question per candidate, template `yes_no_v1`), concurrency 32, exponential backoff
+  with jitter on HTTP 429/529 (base 1 s, cap 30 s, up to 6 retries). The response
+  field `noul` is the score. Failed candidates rank last and are counted.
+- **Track A:** Clef on the test eval cohort (1,200 users), compared with L1 order under
+  the original decision rule.
+- **Track C:** Clef fused with L1 order and with popularity by the Amendment 4 method,
+  weight chosen on the validation eval cohort (279 users). Because this is fixed before
+  any Clef test result, Clef fusion is **pre-registered**, unlike BGE/Qwen3 fusion.
+- Latency is per-user wall clock at concurrency 32 from one client; total backoff time
+  and billed input tokens are recorded in each run manifest.
