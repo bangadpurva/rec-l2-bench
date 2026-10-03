@@ -57,6 +57,16 @@ class StubBackend(Backend):
         raise NotImplementedError(f"{self.name} backend not implemented: {self.reason}")
 
 
+def _ssl_context():
+    """Use certifi's CA bundle when present (python.org macOS builds ship without one)."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 class ClefBackend(Backend):
     """Workers AI Clef / Clef Flash (REST).
 
@@ -81,7 +91,7 @@ class ClefBackend(Backend):
         import urllib.request
         req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_ssl_context()) as r:
                 return r.status, json.loads(r.read())
         except urllib.error.HTTPError as e:
             return e.code, {"error": e.read().decode(errors="replace")[:500]}
