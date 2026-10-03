@@ -139,3 +139,14 @@ def test_score_builds_jev_from_its_config(monkeypatch):
     args = type("A", (), {"scoring_mode": None, "seed": 0, "concurrency": None})()
     rr, cfg, tsha, mode, conc = score.build("jev", args, {}, root / "configs")
     assert rr.backend.name == "jev-1.13.0" and conc == 32 and cfg["price_per_m_input"] == 0.042
+
+
+def test_jev_parses_live_response_exactly():
+    """Verbatim body from the first live Jev call (2026-10-03)."""
+    from recl2bench.rerankers.decision import JevBackend
+    live = {"model": "jev-1.13.0", "answers": {"q0": {"type": "noul", "noul": 0.67}},
+            "usage": {"input_tokens": 295, "output_tokens": 21}}
+    be = JevBackend("key", transport=lambda u, h, b: (200, live))
+    r = be.ask("s", [Q])
+    assert r.probs == pytest.approx([0.67]) and r.model_version == "jev-1.13.0"
+    assert be.usage_input_tokens == 295
