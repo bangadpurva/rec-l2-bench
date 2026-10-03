@@ -145,3 +145,8 @@ Only a 20-user **validation** smoke test of Clef had been run (NDCG@10 not used)
   weight chosen on validation. Pre-registered, as for Clef.
 - Every response's `model` field is logged; a run is invalid if it reports any model
   other than `jev-1.13.0`.
+- *Update before any Jev evaluation run:* the 20-user smoke test showed throughput
+  limited by per-call latency (about 13 req/s at concurrency 32, roughly 2.4 s per call),
+  well under the 80 req/s limit, so Jev runs use **concurrency 96**. Per-user latency is
+  reported at that concurrency; it is a wall-clock figure for one client, not model
+  compute time.

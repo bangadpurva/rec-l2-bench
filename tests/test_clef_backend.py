@@ -138,7 +138,7 @@ def test_score_builds_jev_from_its_config(monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "k")
     args = type("A", (), {"scoring_mode": None, "seed": 0, "concurrency": None})()
     rr, cfg, tsha, mode, conc = score.build("jev", args, {}, root / "configs")
-    assert rr.backend.name == "jev-1.13.0" and conc == 32 and cfg["price_per_m_input"] == 0.042
+    assert rr.backend.name == "jev-1.13.0" and conc == 96 and cfg["price_per_m_input"] == 0.042
 
 
 def test_jev_parses_live_response_exactly():
