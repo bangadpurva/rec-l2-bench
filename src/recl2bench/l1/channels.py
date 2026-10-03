@@ -36,15 +36,17 @@ def popularity_scores(ratings, cohort, users, item_index, window_days: int = 90)
 
 
 def cooccurrence_scores(ratings, cohort, users, item_index, like_min: float = 4,
-                        half_life_days: float = 180) -> np.ndarray:
+                        half_life_days: float = 180, cache: dict | None = None) -> np.ndarray:
     """Item-item co-occurrence over all users' histories before the query time,
     cosine-normalized, scored against each user's recency-weighted liked items.
     Users who share a query time share one co-occurrence matrix."""
     q = _qms(cohort, users)
     n = len(item_index)
     out = np.zeros((len(users), n), dtype=np.float32)
-    mats: dict[int, sp.csr_matrix] = {}
+    mats: dict[int, sp.csr_matrix] = cache if cache is not None else {}
     for t in sorted(set(q.values())):
+        if t in mats:
+            continue
         r = ratings[(ratings.timestamp < t) & ratings.parent_asin.isin(item_index)]
         uix = {u: k for k, u in enumerate(r.user_id.unique())}
         X = sp.csr_matrix((np.ones(len(r), dtype=np.float32),

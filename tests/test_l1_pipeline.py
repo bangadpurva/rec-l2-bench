@@ -168,3 +168,17 @@ def test_conditional_cohort_matches_all_users(raw):
     full_mean = pd.read_parquet(full / "per_user.parquet")["ndcg@10"].mean()
     assert t.loc["popularity", "ndcg@10_all_users"] == pytest.approx(full_mean)
     assert "conditional" in stem.name
+
+
+def test_screen_categories_runs_on_validation(raw):
+    import shutil
+    import screen_categories
+    d = raw / "screen" / "Video_Games"
+    d.mkdir(parents=True)
+    for s in ("train", "valid", "test"):
+        shutil.copy(raw / "raw" / f"Video_Games.{s}.csv.gz", d)
+    t = screen_categories.main(["--categories", "Video_Games", "--raw-root", str(raw / "screen"),
+                                "--n-valid", "60", "--chunk", "25", "--no-download"])
+    row = t.loc["Video_Games"]
+    assert row.cut_points == "ok" and row.sampled_valid_users == 60
+    assert 0 <= row["cooc+pop_users_with_pos@100"] <= 1 and 0 <= row.unreachable_share <= 1

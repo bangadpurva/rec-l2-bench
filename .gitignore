@@ -16,3 +16,4 @@ runs/*/latency.parquet
 
 .env
 results/
+data/screen/
