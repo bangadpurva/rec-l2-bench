@@ -6,7 +6,7 @@
 # Settings come from environment variables (defaults in brackets):
 #   CAT       category, e.g. Musical_Instruments        [category in configs/dataset.yaml]
 #   HL        L1 recency half-life in days              [180]
-#   CHANNELS  L1 channels, comma list of dense,cooc,pop [dense,cooc,pop]
+#   CHANNELS  L1 channels, comma list of dense,cooc,pop [dense,pop]
 #   INDEX     dense index: exact | hnsw                 [hnsw]
 #   CATS      categories for the screen stage           [script default]
 #
@@ -36,7 +36,7 @@ STAGE="${1:-}"
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 CAT="${CAT:-$(python -c "import yaml; print(yaml.safe_load(open('configs/dataset.yaml'))['category'])")}"
 HL="${HL:-180}"
-CHANNELS="${CHANNELS:-dense,cooc,pop}"
+CHANNELS="${CHANNELS:-dense,pop}"
 INDEX="${INDEX:-hnsw}"
 export HF_HOME="${HF_HOME:-$PWD/.hf_cache}"
 

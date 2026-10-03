@@ -3,7 +3,7 @@ encoder:
   revision: null          # TODO: pin to a commit hash before the first real run
 user_vector:
   method: recency_weighted_mean_liked
-  half_life_days: 180     # tuned on validation in the full plan; fixed for the one-day run
+  half_life_days: 180     # chosen on validation (Musical_Instruments): 30/90/180/365 within noise
 index:
   kind: exact             # one-day run: exact search; full plan: faiss_hnsw
   metric: cosine
@@ -12,3 +12,4 @@ pool:
   filters: [seen_before_query, not_yet_available]
 gate:
   min_ann_overlap_at_100: 0.95   # only meaningful when index.kind == faiss_hnsw
+channels: [dense, pop]    # chosen on validation, see PREREGISTRATION.md Amendment 3

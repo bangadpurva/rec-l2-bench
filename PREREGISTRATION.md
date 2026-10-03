@@ -59,3 +59,25 @@ outcome window) instead of a 3,000-user sample, to maximise the conditional eval
 cohort. Validation stays at 2,000 users.
 
 Everything else in Amendment 1 is unchanged.
+
+## Amendment 3 (2026-10-03): L1 settings, chosen on validation only
+
+Musical_Instruments, 2,000 validation users, share of users with a positive in the
+top-100 pool:
+
+| Pool | Users with positive @100 |
+|---|---|
+| dense | 6.6% |
+| cooc | 6.4% |
+| pop | 14.7% |
+| dense+pop | 14.0% |
+| cooc+pop | 13.2% |
+| dense+cooc+pop | 13.0% |
+
+**Pool: dense+pop** (interleaved, dense first), half-life 180 days (30/90/180/365 gave
+6.25-6.60%, within noise), HNSW index. Popularity alone scored 0.7 points higher, a gap
+within sampling error (about ±0.8 points at n=2,000), but a popularity-only pool is
+the same 100 trending items for every user at one query time, and its L1 order would
+be identical to the popularity baseline. dense+pop keeps candidates personalised and
+keeps L1 order and popularity as distinct baselines. The test table printed by the
+same command was not used for this choice.
