@@ -1,9 +1,9 @@
 # Amazon Reviews'23, 5-core, absolute-timestamp split.
-category: Video_Games
+category: Musical_Instruments   # chosen by the validation screen (Amendment 2)
 source: amazon_reviews_2023_5core_timestamp_w_his
 raw_files:
-  ratings: [Video_Games.train.csv.gz, Video_Games.valid.csv.gz, Video_Games.test.csv.gz]
-  meta: meta_Video_Games.jsonl.gz
+  ratings: [<category>.train.csv.gz, <category>.valid.csv.gz, <category>.test.csv.gz]
+  meta: meta_<category>.jsonl.gz
 join_key: parent_asin
 
 split:
@@ -19,7 +19,7 @@ cohort:
   one_day_test_users: 500
   one_day_valid_users: 100
   valid_users: 2000            # Amendment 1 (PREREGISTRATION.md)
-  test_users: 3000             # Amendment 1
+  test_users: null             # Amendment 2: all eligible test users
   full_users_per_split: 2000
 
 label:

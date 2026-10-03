@@ -35,3 +35,25 @@ in the original plan therefore failed.
    metrics.
 
 The decision rule (paired bootstrap, Holm, vs L1 order) is unchanged.
+
+## Amendment 2 (2026-10-03), made before any L2 model was run
+
+**Category.** Video_Games is dropped. Four candidate categories were screened on
+**validation only** (2,000 users each, popularity and co-occurrence L1, no embeddings;
+`scripts/screen_categories.py`). Musical_Instruments had the lowest unreachable share
+(9% of validation positives first seen after the query time) and the highest share of
+users with a positive in a top-100 pool (14.7%), and is the benchmark category. No test
+metric was computed for any candidate; only eligible test-user counts were read.
+
+| Category | Unreachable | Users with positive @100 (best channel) |
+|---|---|---|
+| Musical_Instruments | 9.1% | 14.7% |
+| Baby_Products | 17.8% | 15.8% |
+| Industrial_and_Scientific | 23.3% | 10.6% |
+| Office_Products | 16.6% | 8.1% |
+
+**Test cohort.** All eligible test users (>= 3 prior interactions, >= 1 positive in the
+outcome window) instead of a 3,000-user sample, to maximise the conditional evaluation
+cohort. Validation stays at 2,000 users.
+
+Everything else in Amendment 1 is unchanged.
