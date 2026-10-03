@@ -1,5 +1,9 @@
 # Running the benchmark on Vast.ai
 
+> **Pools are already frozen** (on the project lead's Mac; hashes in `PREREGISTRATION.md`).
+> Do **not** run `data`, `l1-*` stages. Get the backup archive from the project lead,
+> unpack it in the repo root with `tar xzf <file>.tar.gz`, then start at `baselines`.
+
 Everything runs from one script, `scripts/run_pipeline.sh`, one stage at a time.
 Each stage saves its output to `logs/`. Stages marked **STOP** produce numbers that
 decide the next step: send the output for review before moving on.

@@ -81,3 +81,20 @@ the same 100 trending items for every user at one query time, and its L1 order w
 be identical to the popularity baseline. dense+pop keeps candidates personalised and
 keeps L1 order and popularity as distinct baselines. The test table printed by the
 same command was not used for this choice.
+
+## Frozen L1 artifacts (2026-10-03 09:23 EDT), canonical
+
+Frozen once, on an Apple M-series Pro (MPS), with `l1-freeze` (dense+pop, half-life 180,
+HNSW). Every model is scored against these files; `score.py` verifies the hashes on load.
+
+| File | sha256 | Users |
+|---|---|---|
+| `pools_valid.parquet` | `0601046bc4f13aa9e972dff6cb2939bc2c19c0be7b5ae9cc95d1f0775dc72d13` | 2,000 |
+| `pools_test.parquet` | `68ec129ae4ee905df7721912d2bd73967ae9d50113452cc65a1805c120d70cd4` | 9,104 |
+| `eval_users_valid.parquet` | `a7cafc5c6040a3201761ea9234f3e2b1db4590b319fbaf81811927076949c9ae` | 279 |
+| `eval_users_test.parquet` | `59a6bba45219fc93ab6fe4b35cfd7b0bf17977631e148fd7a3d4eaa1839ef73c` | 1,200 |
+
+The freeze ran before model revisions were pinned in the configs, so its report shows
+the encoder as `@None`. Hugging Face `main` for Qwen/Qwen3-Embedding-0.6B was last changed
+2026-04-20, so the effective revision is `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, the
+value now pinned in `configs/l1.yaml` and used for the budget tokenizer.
