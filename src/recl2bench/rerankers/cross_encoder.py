@@ -10,6 +10,22 @@ from __future__ import annotations
 from .base import CandidateItem, Reranker, RerankResult, UserProfile
 
 
+def pick_device(torch, requested: str | None = None) -> str:
+    """CUDA, then Apple GPU (MPS), then CPU."""
+    if requested:
+        return requested
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def pick_dtype(torch, device: str):
+    return torch.float16 if device in ("cuda", "mps") else torch.float32
+
+
 class _HFBase(Reranker):
     def __init__(self, hf_model: str, revision: str | None, max_length: int = 512,
                  batch_size: int = 32, device: str | None = None):
@@ -17,7 +33,8 @@ class _HFBase(Reranker):
         self.torch = torch
         self.hf_model, self.revision = hf_model, revision
         self.max_length, self.batch_size = max_length, batch_size
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = pick_device(torch, device)
+        self.dtype = pick_dtype(torch, self.device)
         self.truncated_pairs = 0
 
     def _batches(self, items):
@@ -33,8 +50,7 @@ class BGEReranker(_HFBase):
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
         self.tok = AutoTokenizer.from_pretrained(hf_model, revision=revision)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            hf_model, revision=revision, torch_dtype=self.torch.float16
-            if self.device == "cuda" else self.torch.float32).to(self.device).eval()
+            hf_model, revision=revision, dtype=self.dtype).to(self.device).eval()
 
     def _score(self, user_profile: UserProfile, candidate_items: list[CandidateItem]):
         q = user_profile.text
@@ -49,7 +65,8 @@ class BGEReranker(_HFBase):
                 logits = self.model(**enc).logits.view(-1).float()
                 scores += self.torch.sigmoid(logits).cpu().tolist()
         return RerankResult(scores=[float(s) for s in scores],
-                            model_version=f"{self.hf_model}@{self.revision}")
+                            model_version=f"{self.hf_model}@{self.revision}",
+                            extra={"device": self.device})
 
 
 class Qwen3Reranker(_HFBase):
@@ -65,8 +82,7 @@ class Qwen3Reranker(_HFBase):
         self.instruction = instruction
         self.tok = AutoTokenizer.from_pretrained(hf_model, revision=revision, padding_side="left")
         self.model = AutoModelForCausalLM.from_pretrained(
-            hf_model, revision=revision, torch_dtype=self.torch.float16
-            if self.device == "cuda" else self.torch.float32).to(self.device).eval()
+            hf_model, revision=revision, dtype=self.dtype).to(self.device).eval()
         self.yes_id = self.tok.convert_tokens_to_ids("yes")
         self.no_id = self.tok.convert_tokens_to_ids("no")
 

@@ -18,7 +18,14 @@ def run(reranker: Reranker, pools: pd.DataFrame, profiles: dict[str, UserProfile
         item_text: dict[str, str], positives: dict[str, set]):
     rows, per_user = [], []
     totals = {"failures": 0, "retries": 0, "versions": set()}
-    for user_id, g in pools.groupby("user_id", sort=True):
+    groups = pools.groupby("user_id", sort=True)
+    try:
+        from tqdm import tqdm
+        groups = tqdm(groups, total=pools.user_id.nunique(), desc=getattr(reranker, "name", "rerank"),
+                      unit="user", mininterval=5)
+    except ImportError:
+        pass
+    for user_id, g in groups:
         g = g.sort_values("rank")
         cands = [CandidateItem(r.parent_asin, int(r.rank), float(r.l1_score), item_text[r.parent_asin])
                  for r in g.itertuples()]

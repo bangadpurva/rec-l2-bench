@@ -119,6 +119,9 @@ def main(argv=None):
         pools = pools[pools.user_id.isin(users)]
 
     reranker, cfg, tsha, mode, conc = build(a.model, a, pos, Path(a.configs))
+    if hasattr(reranker, "device"):
+        print(f"{a.model}: device={reranker.device} dtype={reranker.dtype}", flush=True)
+        a.hardware = f"{a.hardware} [{reranker.device}]"
     started = datetime.now(timezone.utc)
     per_user, scores, totals = run(reranker, pools, profiles, text, pos)
 
