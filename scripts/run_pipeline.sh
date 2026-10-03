@@ -28,6 +28,8 @@
 #   qwen3       Qwen3-Reranker-0.6B on test (GPU)
 #   clef-smoke  Clef Flash on 20 validation users (needs .env keys)        STOP
 #   clef        Clef Flash on test
+#   jev-smoke   Jev on 20 validation users (needs .env key)                STOP
+#   jev         Jev on SPLIT
 #   report      results table -> results/<CAT>/
 #   fuse        Track C: reranker + L1/popularity rank fusion, weight from validation
 #   diagnose    top-10 share and positive ranks by L1 channel, per model
@@ -96,6 +98,12 @@ case "$STAGE" in
   clef-smoke)
     : "${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}" "${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID in .env}"
     run python scripts/score.py "${SCORE_VALID[@]}" --model clef --limit-users 20 ;;
+  jev-smoke)
+    : "${TYPESAFE_API_KEY:?set TYPESAFE_API_KEY in .env}"
+    run python scripts/score.py "${SCORE_VALID[@]}" --model jev --limit-users 20 ${CONCURRENCY:+--concurrency "$CONCURRENCY"} ;;
+  jev)
+    : "${TYPESAFE_API_KEY:?set TYPESAFE_API_KEY in .env}"
+    run python scripts/score.py "${SCORE[@]}" --model jev ${CONCURRENCY:+--concurrency "$CONCURRENCY"} ;;
   clef)
     : "${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}" "${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID in .env}"
     run python scripts/score.py "${SCORE[@]}" --model clef ${CONCURRENCY:+--concurrency "$CONCURRENCY"} ;;

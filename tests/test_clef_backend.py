@@ -109,3 +109,33 @@ def test_gives_up_after_max_retries(profile, candidates):
     rr = DecisionReranker(be, Q, "per_pair", concurrency=1, max_retries=2, sleep=lambda s: None)
     res = rr.rerank(profile, candidates[:1])
     assert res.failures == 1 and "RetryableError" in next(iter(rr.error_samples))
+
+
+def test_jev_request_shape_and_versioned_model():
+    from recl2bench.rerankers.decision import JevBackend
+    seen = {}
+
+    def http(url, headers, body):
+        seen.update(url=url, auth=headers["Authorization"], body=body)
+        return 200, {"model": "jev-1.13.0", "answers": {"q0": {"type": "noul", "noul": 0.42}},
+                     "usage": {"input_tokens": 77}}
+    be = JevBackend("key", transport=http)
+    r = be.ask("state", [Q])
+    assert seen["url"] == "https://api.typesafe.ai/v1/systemone" and seen["auth"] == "Bearer key"
+    assert seen["body"]["model"] == "jev-1.13.0" and seen["body"]["questions"]["q0"]["type"] == "noul"
+    assert r.probs == pytest.approx([0.42]) and r.model_version == "jev-1.13.0"
+    assert be.usage_input_tokens == 77
+    with pytest.raises(ValueError):
+        JevBackend("key", model="jev-latest")
+
+
+def test_score_builds_jev_from_its_config(monkeypatch):
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    import score
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    args = type("A", (), {"scoring_mode": None, "seed": 0, "concurrency": None})()
+    rr, cfg, tsha, mode, conc = score.build("jev", args, {}, root / "configs")
+    assert rr.backend.name == "jev-1.13.0" and conc == 32 and cfg["price_per_m_input"] == 0.042

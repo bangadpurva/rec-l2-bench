@@ -34,7 +34,7 @@ def load_split(runs_dir: Path, base: Path, split: str):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--category", default="Musical_Instruments")
-    ap.add_argument("--rerankers", default="bge,qwen3,clef")
+    ap.add_argument("--rerankers", default="bge,qwen3,clef,jev")
     ap.add_argument("--partners", default="l1_order,popularity")
     ap.add_argument("--runs-dir", default=None)
     ap.add_argument("--data-dir", default="data")

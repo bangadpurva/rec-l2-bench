@@ -1,10 +1,10 @@
 name: jev
 family: decision
 backend: jev
-model_version: jev-1.13.0   # never jev-latest
+model_version: jev-1.13.0   # pinned; never jev-latest (the backend refuses aliases)
+endpoint: https://api.typesafe.ai/v1/systemone
 scoring_mode: per_pair
 template: yes_no_v1
-concurrency: 32             # stays under 40 req/s
+concurrency: 32             # docs limit: 80 req/s, 100K tokens/s
 api_key_env: TYPESAFE_API_KEY
-# TODO: endpoint, request shape and the exact name of the probability field
-# ("Noul value" in the plan) must be taken from the TypeSafe API reference.
+price_per_m_input: 0.042   # USD per docs.typesafe.ai/models; output tokens free

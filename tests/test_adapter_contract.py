@@ -79,7 +79,7 @@ def test_decision_fan_out_chunks_by_max_questions(profile, candidates):
 
 
 def test_unimplemented_backends_fail_loudly_not_silently(profile, candidates):
-    res = DecisionReranker(make_backend("jev"), Q, concurrency=1).rerank(profile, candidates)
+    res = DecisionReranker(make_backend("openai_decisions"), Q, concurrency=1).rerank(profile, candidates)
     assert res.failures == len(candidates)
 
 

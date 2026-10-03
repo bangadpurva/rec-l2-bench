@@ -134,3 +134,14 @@ Only a 20-user **validation** smoke test of Clef had been run (NDCG@10 not used)
   any Clef test result, Clef fusion is **pre-registered**, unlike BGE/Qwen3 fusion.
 - Latency is per-user wall clock at concurrency 32 from one client; total backoff time
   and billed input tokens are recorded in each run manifest.
+
+## Amendment 6 (2026-10-03): Jev, fixed before any Jev call
+
+- **Model and mode:** TypeSafe `jev-1.13.0` (pinned; aliases refused), `POST
+  /v1/systemone`, per-pair scoring with the same `yes_no_v1` noul question, state and
+  backoff as Clef (Amendment 5), concurrency 32 (documented limit 80 req/s).
+- **Track A:** Jev on the test eval cohort vs L1 order, original decision rule.
+- **Track C:** Jev fused with L1 order and with popularity by the Amendment 4 method,
+  weight chosen on validation. Pre-registered, as for Clef.
+- Every response's `model` field is logged; a run is invalid if it reports any model
+  other than `jev-1.13.0`.

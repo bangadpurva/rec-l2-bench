@@ -29,7 +29,7 @@ from recl2bench.manifest import RunManifest  # noqa: E402
 from recl2bench.rerankers.base import UserProfile  # noqa: E402
 from recl2bench.runner import run  # noqa: E402
 
-MODELS = ["l1_order", "random", "popularity", "oracle", "bge", "qwen3", "clef"]
+MODELS = ["l1_order", "random", "popularity", "oracle", "bge", "qwen3", "clef", "jev"]
 
 
 def load_template(path: Path):
@@ -65,12 +65,12 @@ def build(model: str, args, positives, cfg_dir: Path):
         q, sha = load_template(tpath)
         return (Qwen3Reranker(q.question, c["hf_model"], c["revision"], max_length=c["max_length"],
                               batch_size=c["batch_size"]), c, sha, None, None)
-    if model == "clef":
+    if model in ("clef", "jev"):
         from recl2bench.rerankers.decision import DecisionReranker, make_backend
-        c = yaml.safe_load((cfg_dir / "models/clef.yaml").read_text())
+        c = yaml.safe_load((cfg_dir / f"models/{model}.yaml").read_text())
         q, sha = load_template(tpath)
         mode = args.scoring_mode or c["scoring_mode"]
-        be = make_backend("clef", **c)
+        be = make_backend(c["backend"], **c)
         conc = getattr(args, "concurrency", None) or c["concurrency"]
         return DecisionReranker(be, q, mode, concurrency=conc), c, sha, mode, conc
     raise ValueError(model)
@@ -153,8 +153,9 @@ def main(argv=None):
             print(f"  {v}: {k}")
         (out / "errors.json").write_text(__import__("json").dumps(errs, indent=2))
     if hasattr(getattr(reranker, "backend", None), "usage_input_tokens"):
+        price = float(cfg.get("price_per_m_input", 0))
         print(f"input tokens billed: {reranker.backend.usage_input_tokens:,}  "
-              f"(~${reranker.backend.usage_input_tokens * 0.24 / 1e6:.2f} at $0.24/M); "
+              f"(~${reranker.backend.usage_input_tokens * price / 1e6:.2f} at ${price}/M); "
               f"backoff waits: {reranker.retry_wait_s:.1f}s")
     print(f"{run_id}: users={len(per_user)} ndcg@10={per_user['ndcg@10'].mean():.4f} "
           f"failures={totals['failures']} retries={totals['retries']} "

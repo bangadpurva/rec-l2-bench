@@ -62,7 +62,8 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | BGE / Qwen3 cross-encoders | Written per model cards, **not yet run** (needs GPU) |
 | Decision adapter (per-pair, fan-out, retries, failures) | Done, tested with a fake backend |
 | Clef Flash backend | Done; verified against a live response (answer field `noul`) |
-| Jev / OpenAI backends | **Stubs**: request shapes come from each API reference |
+| Jev backend | Done per docs.typesafe.ai; shares the Clef protocol code; needs a live ping |
+| OpenAI Decisions backend | **Stub**: no public spec yet |
 | CLM | **Stub**: needs clm-serve API |
 | Data loading, profiles, item text | Done, tested on synthetic files in the real format |
 | L1 embed, exact + HNSW, gate, freeze | Done, tested with a fake encoder |
@@ -108,4 +109,3 @@ python scripts/report.py --split test     # -> results/test_m100.md and .csv
 
 ## Before the first L2 run
 
-- Implement `Backend.ask` for Jev from the TypeSafe API reference.

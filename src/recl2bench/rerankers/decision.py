@@ -67,25 +67,22 @@ def _ssl_context():
         return ssl.create_default_context()
 
 
-class ClefBackend(Backend):
-    """Workers AI Clef / Clef Flash (REST).
+class SystemOneBackend(Backend):
+    """Shared state-plus-typed-questions protocol (TypeSafe Jev, Cloudflare Clef).
 
     Request:  {"model", "state", "questions": {id: {"type": "noul", "instructions"}}}
-    Response (observed live 2026-10-03): {"result": {"model": "clef-flash",
-              "answers": {id: {"type": "noul", "noul": 0.6758}}, "usage": {...}},
-              "success": true}. The docs page showed "probability"; both are accepted,
-              and the Cloudflare envelope is optional. Older note:
-              Cloudflare's {"result": ..., "success": ...} envelope.
+    Response: {"model", "answers": {id: {"type": "noul", "noul": p}}, "usage": {...}},
+              optionally wrapped in Cloudflare's {"result": ..., "success": ...}.
+              Clef was verified live 2026-10-03; "probability" (seen in docs and
+              SDKs) is also accepted.
     The noul type documents only `instructions`, so the true/false meanings are
     folded into the instruction text.
     """
-    max_questions = 64
+    max_questions: int | None = None
+    label = "systemone"
 
-    def __init__(self, account_id: str, api_token: str, model_id: str = "@cf/cloudflare/clef-flash",
-                 timeout: float = 60.0, transport=None):
-        self.name = model_id.rsplit("/", 1)[-1]          # "clef-flash"
-        self.url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model_id}"
-        self.token, self.timeout = api_token, timeout
+    def __init__(self, url: str, api_token: str, model: str, timeout: float = 60.0, transport=None):
+        self.url, self.token, self.model, self.timeout = url, api_token, model, timeout
         self.transport = transport or self._post
         self.usage_input_tokens = 0
 
@@ -104,10 +101,11 @@ class ClefBackend(Backend):
         return f"{q.question}\nAnswer true if: {q.true_means}\nAnswer false if: {q.false_means}"
 
     def ask(self, state, questions):
-        if not 1 <= len(questions) <= self.max_questions:
-            raise ValueError(f"Clef takes 1-{self.max_questions} questions, got {len(questions)}")
+        cap = self.max_questions
+        if not questions or (cap is not None and len(questions) > cap):
+            raise ValueError(f"{self.label} takes 1-{cap or 'n'} questions, got {len(questions)}")
         keys = [f"q{i}" for i in range(len(questions))]   # ids safe for any item id
-        body = {"model": self.name, "state": state,
+        body = {"model": self.model, "state": state,
                 "questions": {k: {"type": "noul", "instructions": self.instructions(q)}
                               for k, q in zip(keys, questions)}}
         status, data = self.transport(self.url, {"Authorization": f"Bearer {self.token}",
@@ -115,17 +113,46 @@ class ClefBackend(Backend):
         if status in (429, 529) or status >= 500:
             raise RetryableError(f"HTTP {status}: {str(data)[:300]}")
         if status != 200:
-            raise RuntimeError(f"Clef HTTP {status}: {data}")
+            raise RuntimeError(f"{self.label} HTTP {status}: {data}")
         data = data.get("result", data)
-        self.usage_input_tokens += int(data.get("usage", {}).get("input_tokens", 0))
+        self.usage_input_tokens += int((data.get("usage") or {}).get("input_tokens", 0))
         probs = []
         for k in keys:
             a = data["answers"][k]
             v = a.get("noul", a.get("probability"))
             if v is None:
-                raise ValueError(f"no 'noul' or 'probability' in Clef answer: {a}")
+                raise ValueError(f"no 'noul' or 'probability' in {self.label} answer: {a}")
             probs.append(float(v))
         return BackendReply(probs, data.get("model"))
+
+
+class ClefBackend(SystemOneBackend):
+    """Cloudflare Workers AI: Clef / Clef Flash. Up to 64 questions per request."""
+    max_questions = 64
+    label = "Clef"
+
+    def __init__(self, account_id: str, api_token: str, model_id: str = "@cf/cloudflare/clef-flash",
+                 timeout: float = 60.0, transport=None):
+        self.name = model_id.rsplit("/", 1)[-1]          # "clef-flash"
+        super().__init__(f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model_id}",
+                         api_token, self.name, timeout, transport)
+
+
+class JevBackend(SystemOneBackend):
+    """TypeSafe Jev (docs.typesafe.ai): POST /v1/systemone, Bearer auth.
+
+    Pin a versioned model (jev-1.13.0), never the jev-latest alias. Limits per the
+    models page: 80 req/s, 100K tokens/s, 64K context per request.
+    """
+    label = "Jev"
+    URL = "https://api.typesafe.ai/v1/systemone"
+
+    def __init__(self, api_token: str, model: str = "jev-1.13.0", timeout: float = 60.0,
+                 transport=None, url: str | None = None):
+        if model.endswith("latest") or model.endswith("preview"):
+            raise ValueError("pin a versioned Jev model, not an alias")
+        self.name = model
+        super().__init__(url or self.URL, api_token, model, timeout, transport)
 
 
 def make_backend(backend: str, /, **cfg) -> Backend:
@@ -136,8 +163,11 @@ def make_backend(backend: str, /, **cfg) -> Backend:
         return ClefBackend(os.environ[cfg.get("account_id_env", "CLOUDFLARE_ACCOUNT_ID")],
                            os.environ[cfg.get("api_key_env", "CLOUDFLARE_API_TOKEN")],
                            cfg.get("model_version", "@cf/cloudflare/clef-flash"))
+    if name == "jev":
+        import os
+        return JevBackend(os.environ[cfg.get("api_key_env", "TYPESAFE_API_KEY")],
+                          cfg.get("model_version", "jev-1.13.0"), url=cfg.get("endpoint"))
     reasons = {
-        "jev": "copy request/response shape from TypeSafe API reference (pin jev-1.13.0)",
         "openai_decisions": "limited preview; no public spec until access is granted",
     }
     if name not in reasons:
