@@ -1,12 +1,15 @@
 # Amazon Reviews'23, 5-core, absolute-timestamp split.
 category: Video_Games
-source: amazon_reviews_2023_5core_timestamp
+source: amazon_reviews_2023_5core_timestamp_w_his
+raw_files:
+  ratings: [Video_Games.train.csv.gz, Video_Games.valid.csv.gz, Video_Games.test.csv.gz]
+  meta: meta_Video_Games.jsonl.gz
 join_key: parent_asin
 
 split:
   # train < valid_start <= valid < test_start <= test
-  valid_start: "2021-08-11"   # validation query time
-  test_start:  "2022-07-16"   # test query time
+  valid_start_ms: 1628643414042   # 2021-08-11 01:16:54 UTC, validation query time
+  test_start_ms:  1658002729837   # 2022-07-16 20:18:49 UTC, test query time
 
 cohort:
   min_prior_interactions: 3
@@ -30,7 +33,7 @@ profile:
 item_text:
   fields: [title, features, description, store, categories, price]
   # 2023 crawl-time aggregates that include future behavior (leakage audit).
-  drop_fields: [average_rating, rating_number, bought_together]
+  drop_fields: [average_rating, rating_number, bought_together, images, videos]
 
 budget:
   tokenizer: Qwen/Qwen3-Embedding-0.6B   # one tokenizer counts every budget

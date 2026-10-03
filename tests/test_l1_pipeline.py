@@ -1,0 +1,91 @@
+"""End-to-end on synthetic raw files in the real Amazon'23 format:
+download layout -> prepare_data.py -> run_l1.py (exact + HNSW) -> frozen, audited pools."""
+import gzip
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from recl2bench.data.split import TEST_START_MS, VALID_START_MS
+from recl2bench.l1 import pools as P
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import prepare_data  # noqa: E402
+import run_l1  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+DAY = 86_400_000
+
+
+@pytest.fixture
+def raw(tmp_path):
+    rng = np.random.default_rng(0)
+    items = [f"A{i:04d}" for i in range(400)]
+    t0 = VALID_START_MS - 900 * DAY
+    rows = []
+    for u in range(150):
+        n_prior = rng.integers(3, 12)
+        for t in rng.uniform(t0, VALID_START_MS - DAY, n_prior):
+            rows.append((f"U{u}", rng.choice(items[:300]), int(rng.choice([1, 2, 4, 5, 5])), int(t)))
+        for lo, hi in ((VALID_START_MS, TEST_START_MS), (TEST_START_MS, TEST_START_MS + 300 * DAY)):
+            for t in rng.uniform(lo, hi, rng.integers(1, 4)):
+                rows.append((f"U{u}", rng.choice(items), int(rng.choice([3, 4, 5])), int(t)))
+    df = pd.DataFrame(rows, columns=["user_id", "parent_asin", "rating", "timestamp"])
+    df = df.drop_duplicates(["user_id", "parent_asin"])
+    df["history"] = ""
+    d = tmp_path / "raw"
+    d.mkdir()
+    for name, part in (("train", df[df.timestamp < VALID_START_MS]),
+                       ("valid", df[(df.timestamp >= VALID_START_MS) & (df.timestamp < TEST_START_MS)]),
+                       ("test", df[df.timestamp >= TEST_START_MS])):
+        part.to_csv(d / f"Video_Games.{name}.csv.gz", index=False)
+    with gzip.open(d / "meta_Video_Games.jsonl.gz", "wt") as f:
+        for i, a in enumerate(items):
+            f.write(json.dumps({"parent_asin": a, "title": f"Game {i}", "store": "Nintendo",
+                                "categories": ["Video Games", "Nintendo Switch"], "features": ["fun"],
+                                "description": ["long " * 300], "price": 19.99,
+                                "average_rating": 4.4, "rating_number": 10,
+                                "bought_together": None, "images": []}) + "\n")
+    return tmp_path
+
+
+def test_prepare_and_l1(raw):
+    proc, pools_dir = raw / "processed", raw / "pools"
+    prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
+                       "--out", str(proc), "--n-valid", "40", "--n-test", "60",
+                       "--tokenizer", "whitespace"])
+    items = pd.read_parquet(proc / "items.parquet")
+    assert "average_rating" not in items.columns and items.truncated.all()  # long descriptions cut
+    assert items.n_tokens.max() <= 160
+    rep = json.loads((proc / "prepare_report.json").read_text())
+    assert rep["splits"]["test"]["cohort_users"] == 60
+
+    common = ["--dataset-config", str(ROOT / "configs/dataset.yaml"),
+              "--l1-config", str(ROOT / "configs/l1.yaml"), "--raw", str(raw / "raw"),
+              "--proc", str(proc), "--pools-dir", str(pools_dir), "--encoder", "fake"]
+    run_l1.main(common + ["--tune-half-life", "30,180"])
+    run_l1.main(common + ["--index", "exact", "--freeze"])
+
+    report = json.loads((pools_dir / "l1_report.json").read_text())
+    t = report["splits"]["test"]
+    assert 0 <= t["recall@50"] <= t["recall@100"] <= t["recall@200"] <= t["max_reachable_share"] + 1e-9
+    pools, h = P.load(pools_dir / "pools_test.parquet", top_m=100)
+    assert h == t["pool_sha256"] and pools.groupby("user_id").size().max() <= 100
+    with pytest.raises(FileExistsError):      # frozen: a second freeze refuses
+        run_l1.main(common + ["--index", "exact", "--freeze"])
+
+
+def test_hnsw_matches_exact_on_small_catalog(raw):
+    proc = raw / "processed"
+    prepare_data.main(["--config", str(ROOT / "configs/dataset.yaml"), "--raw", str(raw / "raw"),
+                       "--out", str(proc), "--n-valid", "40", "--n-test", "40",
+                       "--tokenizer", "whitespace"])
+    run_l1.main(["--dataset-config", str(ROOT / "configs/dataset.yaml"),
+                 "--l1-config", str(ROOT / "configs/l1.yaml"), "--raw", str(raw / "raw"),
+                 "--proc", str(proc), "--encoder", "fake", "--index", "hnsw"])
+    rep = json.loads((proc / "l1_report.json").read_text())
+    assert rep["splits"]["valid"]["gate_passed"]
+    assert rep["splits"]["valid"]["ann_overlap@100"] > 0.95

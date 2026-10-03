@@ -53,13 +53,30 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | Split, cohort, leakage audit, pool freezing | Done, tested on a synthetic ratings table |
 | BGE / Qwen3 cross-encoders | Written per model cards, **not yet run** (needs GPU) |
 | Decision adapter (per-pair, fan-out, retries, failures) | Done, tested with a fake backend |
-| Jev / Clef / OpenAI backends | **Stubs**: request shapes come from each API reference |
+| Clef Flash backend | Done per the Workers AI docs, tested against a mocked endpoint; needs one live call |
+| Jev / OpenAI backends | **Stubs**: request shapes come from each API reference |
 | CLM | **Stub**: needs clm-serve API |
-| L1 embedding + retrieval, profiles, baselines, report | Not started |
+| Data loading, profiles, item text | Done, tested on synthetic files in the real format |
+| L1 embed, exact + HNSW, gate, freeze | Done, tested with a fake encoder |
+| Baselines (popularity, SASRec), report | Not started |
 
-## Before the first real run
+## Running L1 (GPU box)
+
+```bash
+pip install -e ".[models,dev]"
+bash scripts/download_data.sh                          # ~4 files into data/raw/
+python scripts/prepare_data.py                         # 100 valid / 500 test users (one-day sizes)
+python scripts/run_l1.py --tune-half-life 30,90,180,365    # validation Recall@100 per half-life
+python scripts/run_l1.py --half-life <best> --index hnsw   # dry run: gate + diagnostics, nothing frozen
+python scripts/run_l1.py --half-life <best> --index hnsw --freeze   # irreversible
+```
+
+Read `data/pools/l1_report.json` before any L2 work: Recall@50/100/200, ANN overlap,
+and `max_reachable_share` (positives that are neither already-seen nor first seen after
+query time). Recall can never exceed that ceiling.
+
+## Before the first L2 run
 
 - Pin every `revision: null` in `configs/` to a commit hash.
-- Implement `Backend.ask` for Jev and Clef from their API docs; confirm the probability
-  field name (the plan's "Noul value").
-- Download Video_Games 5-core timestamp files and metadata into `data/raw/`.
+- Make one live Clef Flash call and confirm the response shape matches `ClefBackend`.
+- Implement `Backend.ask` for Jev from the TypeSafe API reference.

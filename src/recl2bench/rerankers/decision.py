@@ -10,6 +10,7 @@ field must be copied from each provider's API reference, not guessed. Implement
 """
 from __future__ import annotations
 
+import json
 import math
 import random
 from abc import ABC, abstractmethod
@@ -56,10 +57,66 @@ class StubBackend(Backend):
         raise NotImplementedError(f"{self.name} backend not implemented: {self.reason}")
 
 
+class ClefBackend(Backend):
+    """Workers AI Clef / Clef Flash (REST).
+
+    Request:  {"model", "state", "questions": {id: {"type": "noul", "instructions"}}}
+    Response: {"model", "answers": {id: {"probability"}}, "usage"}, possibly wrapped in
+              Cloudflare's {"result": ..., "success": ...} envelope.
+    The noul type documents only `instructions`, so the true/false meanings are
+    folded into the instruction text.
+    """
+    max_questions = 64
+
+    def __init__(self, account_id: str, api_token: str, model_id: str = "@cf/cloudflare/clef-flash",
+                 timeout: float = 60.0, transport=None):
+        self.name = model_id.rsplit("/", 1)[-1]          # "clef-flash"
+        self.url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model_id}"
+        self.token, self.timeout = api_token, timeout
+        self.transport = transport or self._post
+        self.usage_input_tokens = 0
+
+    def _post(self, url, headers, body):
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, {"error": e.read().decode(errors="replace")[:500]}
+
+    @staticmethod
+    def instructions(q: YesNoQuestion) -> str:
+        return f"{q.question}\nAnswer true if: {q.true_means}\nAnswer false if: {q.false_means}"
+
+    def ask(self, state, questions):
+        if not 1 <= len(questions) <= self.max_questions:
+            raise ValueError(f"Clef takes 1-{self.max_questions} questions, got {len(questions)}")
+        keys = [f"q{i}" for i in range(len(questions))]   # ids safe for any item id
+        body = {"model": self.name, "state": state,
+                "questions": {k: {"type": "noul", "instructions": self.instructions(q)}
+                              for k, q in zip(keys, questions)}}
+        status, data = self.transport(self.url, {"Authorization": f"Bearer {self.token}",
+                                                 "Content-Type": "application/json"}, body)
+        if status in (429, 529) or status >= 500:
+            raise RetryableError(f"HTTP {status}")
+        if status != 200:
+            raise RuntimeError(f"Clef HTTP {status}: {data}")
+        data = data.get("result", data)
+        self.usage_input_tokens += int(data.get("usage", {}).get("input_tokens", 0))
+        probs = [float(data["answers"][k]["probability"]) for k in keys]
+        return BackendReply(probs, data.get("model"))
+
+
 def make_backend(name: str, **cfg) -> Backend:
+    if name in ("clef", "clef_flash"):
+        import os
+        return ClefBackend(os.environ[cfg.get("account_id_env", "CLOUDFLARE_ACCOUNT_ID")],
+                           os.environ[cfg.get("api_key_env", "CLOUDFLARE_API_TOKEN")],
+                           cfg.get("model_version", "@cf/cloudflare/clef-flash"))
     reasons = {
         "jev": "copy request/response shape from TypeSafe API reference (pin jev-1.13.0)",
-        "clef": "copy request/response shape from Workers AI @cf/cloudflare/clef docs",
         "openai_decisions": "limited preview; no public spec until access is granted",
     }
     if name not in reasons:
