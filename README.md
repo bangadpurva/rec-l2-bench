@@ -61,7 +61,7 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | Split, cohort, leakage audit, pool freezing | Done, tested on a synthetic ratings table |
 | BGE / Qwen3 cross-encoders | Written per model cards, **not yet run** (needs GPU) |
 | Decision adapter (per-pair, fan-out, retries, failures) | Done, tested with a fake backend |
-| Clef Flash backend | Done per the Workers AI docs, tested against a mocked endpoint; needs one live call |
+| Clef Flash backend | Done; verified against a live response (answer field `noul`) |
 | Jev / OpenAI backends | **Stubs**: request shapes come from each API reference |
 | CLM | **Stub**: needs clm-serve API |
 | Data loading, profiles, item text | Done, tested on synthetic files in the real format |
@@ -108,5 +108,4 @@ python scripts/report.py --split test     # -> results/test_m100.md and .csv
 
 ## Before the first L2 run
 
-- Make one live Clef Flash call and confirm the response shape matches `ClefBackend`.
 - Implement `Backend.ask` for Jev from the TypeSafe API reference.

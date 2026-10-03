@@ -71,7 +71,10 @@ class ClefBackend(Backend):
     """Workers AI Clef / Clef Flash (REST).
 
     Request:  {"model", "state", "questions": {id: {"type": "noul", "instructions"}}}
-    Response: {"model", "answers": {id: {"probability"}}, "usage"}, possibly wrapped in
+    Response (observed live 2026-10-03): {"result": {"model": "clef-flash",
+              "answers": {id: {"type": "noul", "noul": 0.6758}}, "usage": {...}},
+              "success": true}. The docs page showed "probability"; both are accepted,
+              and the Cloudflare envelope is optional. Older note:
               Cloudflare's {"result": ..., "success": ...} envelope.
     The noul type documents only `instructions`, so the true/false meanings are
     folded into the instruction text.
@@ -115,7 +118,13 @@ class ClefBackend(Backend):
             raise RuntimeError(f"Clef HTTP {status}: {data}")
         data = data.get("result", data)
         self.usage_input_tokens += int(data.get("usage", {}).get("input_tokens", 0))
-        probs = [float(data["answers"][k]["probability"]) for k in keys]
+        probs = []
+        for k in keys:
+            a = data["answers"][k]
+            v = a.get("noul", a.get("probability"))
+            if v is None:
+                raise ValueError(f"no 'noul' or 'probability' in Clef answer: {a}")
+            probs.append(float(v))
         return BackendReply(probs, data.get("model"))
 
 

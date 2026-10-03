@@ -7,8 +7,8 @@ Q = YesNoQuestion("yes_no_v1", "Will they buy it?", "matches", "doesn't")
 
 
 class FakeHTTP:
-    def __init__(self, statuses=(200,), envelope=True):
-        self.statuses, self.envelope, self.bodies = list(statuses), envelope, []
+    def __init__(self, statuses=(200,), envelope=True, field="noul"):
+        self.statuses, self.envelope, self.bodies, self.field = list(statuses), envelope, [], field
 
     def __call__(self, url, headers, body):
         assert url.endswith("/ai/run/@cf/cloudflare/clef-flash")
@@ -17,7 +17,7 @@ class FakeHTTP:
         status = self.statuses.pop(0) if self.statuses else 200
         if status != 200:
             return status, {"error": "x"}
-        ans = {k: {"probability": 0.1 + 0.1 * i} for i, k in enumerate(body["questions"])}
+        ans = {k: {"type": "noul", self.field: 0.1 + 0.1 * i} for i, k in enumerate(body["questions"])}
         data = {"model": "clef-flash", "answers": ans, "usage": {"input_tokens": 100}}
         return 200, ({"result": data, "success": True} if self.envelope else data)
 
@@ -69,3 +69,24 @@ def test_score_builds_clef_from_its_config(monkeypatch):
     rr, cfg, tsha, mode, conc = score.build("clef", args, {}, root / "configs")
     assert rr.backend.name == "clef-flash" and mode == "per_pair" and tsha
     assert rr.backend.url.endswith("/accounts/acct/ai/run/@cf/cloudflare/clef-flash")
+
+
+def test_parses_live_response_shape_exactly():
+    """Verbatim body from the first live call (2026-10-03)."""
+    live = {"result": {"model": "clef-flash", "answers": {"q0": {"type": "noul", "noul": 0.6758}},
+                       "usage": {"input_tokens": 166, "output_tokens": 0}},
+            "success": True, "errors": [], "messages": []}
+    be = ClefBackend("acct", "tok", transport=lambda url, h, body: (200, live))
+    reply = be.ask("s", [Q])
+    assert reply.probs == pytest.approx([0.6758]) and reply.model_version == "clef-flash"
+    assert be.usage_input_tokens == 166
+
+
+def test_docs_field_name_still_accepted():
+    assert ClefBackend("acct", "tok", transport=FakeHTTP(field="probability")).ask("s", [Q]).probs == pytest.approx([0.1])
+
+
+def test_missing_probability_field_is_an_error():
+    bad = {"result": {"model": "clef-flash", "answers": {"q0": {"type": "noul"}}}}
+    with pytest.raises(ValueError):
+        ClefBackend("acct", "tok", transport=lambda u, h, b: (200, bad)).ask("s", [Q])
