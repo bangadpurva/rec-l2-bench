@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Data stays out of git; frozen pool hashes (.sha256) are committed.
+data/raw/*
+data/processed/*
+data/pools/*.parquet
+!data/**/.gitkeep
+
+# Run outputs are large; manifests are committed.
+runs/*/scores.parquet
+runs/*/latency.parquet
+
+.env

@@ -1,0 +1,8 @@
+name: bge_reranker
+family: cross_encoder
+hf_model: BAAI/bge-reranker-v2-m3
+revision: null            # TODO: pin commit hash
+score: sigmoid_logit
+template: null            # no instruction slot
+batch_size: 32
+max_length: 512

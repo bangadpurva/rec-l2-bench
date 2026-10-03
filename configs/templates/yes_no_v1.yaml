@@ -1,0 +1,10 @@
+# Frozen after validation. Any edit changes template_sha256 in every manifest.
+id: yes_no_v1
+question: >-
+  Based on this shopper's past ratings, will they buy the candidate product and
+  rate it 4 stars or higher?
+true_means: >-
+  It matches what they rated highly (platform, genre, franchise, accessory type)
+  and avoids what they rated low.
+false_means: >-
+  It is off-platform, unrelated to their history, or resembles items they rated low.

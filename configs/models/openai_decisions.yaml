@@ -1,0 +1,8 @@
+name: openai_decisions
+family: decision
+backend: openai_decisions
+model_version: null         # unknown until preview access
+scoring_mode: per_pair
+template: yes_no_v1
+api_key_env: OPENAI_API_KEY
+# Stub until access arrives: no public spec yet.

@@ -1,0 +1,11 @@
+name: clef
+family: decision
+backend: clef
+model_version: "@cf/cloudflare/clef"
+scoring_mode: per_pair      # fall back to fan_out (<=64 questions) if rate-limited
+template: yes_no_v1
+max_questions_per_request: 64
+concurrency: 16             # TODO: set from Clef's published rate limit
+api_key_env: CLOUDFLARE_API_TOKEN
+account_id_env: CLOUDFLARE_ACCOUNT_ID
+# TODO: request/response shape from the Workers AI Clef page.

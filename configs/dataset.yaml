@@ -1,0 +1,39 @@
+# Amazon Reviews'23, 5-core, absolute-timestamp split.
+category: Video_Games
+source: amazon_reviews_2023_5core_timestamp
+join_key: parent_asin
+
+split:
+  # train < valid_start <= valid < test_start <= test
+  valid_start: "2021-08-11"   # validation query time
+  test_start:  "2022-07-16"   # test query time
+
+cohort:
+  min_prior_interactions: 3
+  min_positives_in_window: 1
+  seed: 20261002
+  pilot_valid_users: 200
+  one_day_test_users: 500
+  one_day_valid_users: 100
+  full_users_per_split: 2000
+
+label:
+  positive_min_rating: 4
+  sensitivity_positive_rating: 5
+  negative_max_rating: 2
+
+profile:
+  max_liked: 10
+  max_disliked: 3
+  item_fields: [title, rating, attr1, attr2]
+
+item_text:
+  fields: [title, features, description, store, categories, price]
+  # 2023 crawl-time aggregates that include future behavior (leakage audit).
+  drop_fields: [average_rating, rating_number, bought_together]
+
+budget:
+  tokenizer: Qwen/Qwen3-Embedding-0.6B   # one tokenizer counts every budget
+  per_pair_tokens: 512
+  profile_tokens: 352
+  item_tokens: 160

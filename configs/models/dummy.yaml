@@ -1,0 +1,4 @@
+name: dummy
+family: dummy
+mode: l1_order              # l1_order | random
+seed: 0

@@ -1,0 +1,10 @@
+name: jev
+family: decision
+backend: jev
+model_version: jev-1.13.0   # never jev-latest
+scoring_mode: per_pair
+template: yes_no_v1
+concurrency: 32             # stays under 40 req/s
+api_key_env: TYPESAFE_API_KEY
+# TODO: endpoint, request shape and the exact name of the probability field
+# ("Noul value" in the plan) must be taken from the TypeSafe API reference.

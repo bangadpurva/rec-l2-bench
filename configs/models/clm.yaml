@@ -1,0 +1,10 @@
+name: clm
+family: decision_contrastive
+backend: clm
+checkpoint: CLM-v0.1-8B
+checkpoint_sha256: null     # TODO
+encoder: Qwen/Qwen3-8B
+encoder_revision: null      # TODO
+vllm_version: null          # TODO
+serve_url_env: CLM_SERVE_URL
+max_input_tokens: 2048
