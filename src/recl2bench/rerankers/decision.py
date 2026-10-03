@@ -146,6 +146,14 @@ class DecisionReranker(Reranker):
         self.scoring_mode, self.concurrency = scoring_mode, concurrency
         self.max_retries, self.shuffle_seed = max_retries, shuffle_seed
         self.name = f"{backend.name}:{scoring_mode}"
+        self.error_samples: dict[str, int] = {}     # error text -> count, across the run
+
+    def _record_error(self, e: Exception) -> None:
+        import sys
+        key = f"{type(e).__name__}: {str(e)[:300]}"
+        if key not in self.error_samples:
+            print(f"\n[{self.name}] backend error: {key}", file=sys.stderr, flush=True)
+        self.error_samples[key] = self.error_samples.get(key, 0) + 1
 
     def _call(self, state, questions):
         retries = 0
@@ -167,7 +175,8 @@ class DecisionReranker(Reranker):
             try:
                 reply, r = self._call(build_state(profile, item=c), [self.question])
                 return reply.probs[0], reply.model_version, r, 0
-            except Exception:  # noqa: BLE001 - recorded as a failure, never ranked
+            except Exception as e:  # noqa: BLE001 - recorded as a failure, never ranked
+                self._record_error(e)
                 return math.nan, None, 0, 1
 
         with ThreadPoolExecutor(self.concurrency) as ex:
@@ -200,7 +209,8 @@ class DecisionReranker(Reranker):
                 versions.add(reply.model_version)
                 for i, p in zip(chunk, reply.probs):
                     scores[i] = float(p)
-            except Exception:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001
+                self._record_error(e)
                 failures += len(chunk)
         versions.discard(None)
         return RerankResult(scores=scores, model_version=",".join(sorted(versions)) or None,

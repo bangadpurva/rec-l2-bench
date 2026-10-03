@@ -142,6 +142,12 @@ def main(argv=None):
     per_user.assign(split=a.split, top_m=a.top_m, limit_users=a.limit_users or 0, cohort=a.cohort
                     ).to_parquet(out / "per_user.parquet", index=False)
     scores.to_parquet(out / "scores.parquet", index=False)
+    errs = getattr(reranker, "error_samples", {})
+    if errs:
+        print("backend errors (count: message):")
+        for k, v in sorted(errs.items(), key=lambda kv: -kv[1])[:5]:
+            print(f"  {v}: {k}")
+        (out / "errors.json").write_text(__import__("json").dumps(errs, indent=2))
     if hasattr(getattr(reranker, "backend", None), "usage_input_tokens"):
         print(f"input tokens billed: {reranker.backend.usage_input_tokens:,}")
     print(f"{run_id}: users={len(per_user)} ndcg@10={per_user['ndcg@10'].mean():.4f} "

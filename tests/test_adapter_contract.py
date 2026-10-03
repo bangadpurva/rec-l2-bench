@@ -63,8 +63,10 @@ class FakeBackend(Backend):
 
 
 def test_decision_per_pair_counts_retries_and_failures(profile, candidates):
-    res = DecisionReranker(FakeBackend(), Q, "per_pair", concurrency=1).rerank(profile, candidates)
+    rr = DecisionReranker(FakeBackend(), Q, "per_pair", concurrency=1)
+    res = rr.rerank(profile, candidates)
     assert res.retries == 1 and res.failures == 1
+    assert rr.error_samples == {"RuntimeError: boom": 1}
     assert math.isnan(res.scores[3])
     assert res.model_version == "fake-1.0"
 
