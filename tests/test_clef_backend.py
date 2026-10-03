@@ -138,7 +138,7 @@ def test_score_builds_jev_from_its_config(monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "k")
     args = type("A", (), {"scoring_mode": None, "seed": 0, "concurrency": None})()
     rr, cfg, tsha, mode, conc = score.build("jev", args, {}, root / "configs")
-    assert rr.backend.name == "jev-1.13.0" and conc == 96 and cfg["price_per_m_input"] == 0.042
+    assert rr.backend.name == "jev-1.13.0" and conc == 32 and cfg["price_per_m_input"] == 0.042
 
 
 def test_jev_parses_live_response_exactly():
@@ -150,3 +150,29 @@ def test_jev_parses_live_response_exactly():
     r = be.ask("s", [Q])
     assert r.probs == pytest.approx([0.67]) and r.model_version == "jev-1.13.0"
     assert be.usage_input_tokens == 295
+
+
+def test_network_timeouts_are_retryable(monkeypatch, profile, candidates):
+    import urllib.error
+    import urllib.request
+    from recl2bench.rerankers.decision import JevBackend
+    calls = {"n": 0}
+
+    class Resp:
+        status = 200
+        def read(self):
+            return b'{"model": "jev-1.13.0", "answers": {"q0": {"type": "noul", "noul": 0.5}}}'
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(req, timeout=None, context=None):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise urllib.error.URLError(TimeoutError("The handshake operation timed out"))
+        return Resp()
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    rr = DecisionReranker(JevBackend("k"), Q, "per_pair", concurrency=1, sleep=lambda s: None)
+    res = rr.rerank(profile, candidates[:1])
+    assert res.failures == 0 and res.retries == 2 and res.scores == [0.5]

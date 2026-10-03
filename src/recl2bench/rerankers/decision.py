@@ -95,6 +95,9 @@ class SystemOneBackend(Backend):
                 return r.status, json.loads(r.read())
         except urllib.error.HTTPError as e:
             return e.code, {"error": e.read().decode(errors="replace")[:500]}
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+            # network-level: handshake/connect/read timeouts, resets. Transient -> retry.
+            raise RetryableError(f"network: {e}") from e
 
     @staticmethod
     def instructions(q: YesNoQuestion) -> str:

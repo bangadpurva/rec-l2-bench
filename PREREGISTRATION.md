@@ -150,3 +150,9 @@ Only a 20-user **validation** smoke test of Clef had been run (NDCG@10 not used)
   well under the 80 req/s limit, so Jev runs use **concurrency 96**. Per-user latency is
   reported at that concurrency; it is a wall-clock figure for one client, not model
   compute time.
+- *Update after the Jev validation run, before the test run:* at concurrency 96 the
+  validation run (279 users) kept the same ~12 req/s throughput but per-call latency
+  rose to ~8 s and 38 of 27,900 calls (0.14%) failed on network timeouts, which were not
+  retried. Network-level errors are now retried with the same backoff as 429/529, and
+  Jev test runs use **concurrency 32**. The validation run is kept as is (its failed
+  candidates rank last; it is used only to pick the fusion weight).
