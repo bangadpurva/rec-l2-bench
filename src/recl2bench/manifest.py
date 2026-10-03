@@ -33,6 +33,8 @@ class RunManifest:
     eval_cohort_sha256: str | None = None
     n_users_scored: int = 0
     n_users_full_cohort: int = 0
+    setting: str | None = None                # ESCI: "retrieved" (L1 top-100) or "judged" lists
+    cost_usd: float | None = None             # API models: billed input tokens x price
     input_tokens: int | None = None           # API models: tokens billed, from response usage
     retry_wait_s: float | None = None         # API models: total seconds spent in retry backoff
 

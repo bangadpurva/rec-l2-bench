@@ -15,7 +15,8 @@ from .rerankers.base import CandidateItem, Reranker, UserProfile
 
 
 def run(reranker: Reranker, pools: pd.DataFrame, profiles: dict[str, UserProfile],
-        item_text: dict[str, str], positives: dict[str, set]):
+        item_text: dict[str, str], positives: dict[str, set], metric_fn=None):
+    """metric_fn(ranked, user_id) -> dict overrides the default binary metrics (ESCI)."""
     rows, per_user = [], []
     totals = {"failures": 0, "retries": 0, "versions": set()}
     groups = pools.groupby("user_id", sort=True)
@@ -39,7 +40,7 @@ def run(reranker: Reranker, pools: pd.DataFrame, profiles: dict[str, UserProfile
         # Failed candidates fall to the bottom, in L1 order; counted in failures.
         safe = [(-math.inf if math.isnan(s) else s) for s in res.scores]
         ranked = order_by_scores([c.item_id for c in cands], safe)
-        m = user_metrics(ranked, positives[user_id])
+        m = metric_fn(ranked, user_id) if metric_fn else user_metrics(ranked, positives[user_id])
         per_user.append({"user_id": user_id, "latency_s": dt, "failures": res.failures, **m})
         rows += [{"user_id": user_id, "parent_asin": c.item_id, "l1_rank": c.l1_rank, "score": s}
                  for c, s in zip(cands, res.scores)]

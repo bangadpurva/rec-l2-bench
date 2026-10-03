@@ -10,6 +10,13 @@ Primary metric (pre-registered, see `PREREGISTRATION.md`): **NDCG@10 on the cond
 test cohort** (users whose frozen top-100 pool holds a positive), paired bootstrap vs L1
 order with Holm correction. All-user NDCG@10 is reported as secondary.
 
+## Two studies
+
+| Study | Task | Status | Runbook |
+|---|---|---|---|
+| **ESCI** (current) | Query → content ANN top-100 → L2 rerankers; primary P@10 | Pipeline built and tested; not yet run | [`ESCI.md`](ESCI.md), [`PREREGISTRATION_ESCI.md`](PREREGISTRATION_ESCI.md) |
+| Amazon Reviews'23 | Future purchases from a user's history | Baselines, BGE, Qwen3 and fusion done; behaviour-dominated, so text rerankers lose to L1 | [`VASTAI.md`](VASTAI.md), [`PREREGISTRATION.md`](PREREGISTRATION.md) |
+
 ## Running it
 
 **On Vast.ai (or any Linux GPU box): follow [`VASTAI.md`](VASTAI.md).** One setup script,
@@ -64,7 +71,7 @@ logged failure; the contract rejects unlogged NaNs. Failed candidates rank last,
 | Clef Flash backend | Done; verified against a live response (answer field `noul`) |
 | Jev backend | Done per docs.typesafe.ai; shares the Clef protocol code; needs a live ping |
 | OpenAI Decisions backend | **Stub**: no public spec yet |
-| CLM | **Stub**: needs clm-serve API |
+| CLM | Adapter for `contrastive-lm` `Engine.rank` (one call per query), tested with a fake engine; needs a GPU run |
 | Data loading, profiles, item text | Done, tested on synthetic files in the real format |
 | L1 embed, exact + HNSW, gate, freeze | Done, tested with a fake encoder |
 | L1 channels: co-occurrence, popularity, interleaved merge | Done, tested (incl. no future data) |

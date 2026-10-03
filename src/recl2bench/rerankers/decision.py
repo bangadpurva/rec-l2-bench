@@ -178,13 +178,18 @@ def make_backend(backend: str, /, **cfg) -> Backend:
     return StubBackend(name, reasons[name])
 
 
+DEFAULT_STATE_LABELS = ("Shopper history", "Candidate product")
+
+
 def build_state(profile: UserProfile, item: CandidateItem | None = None,
-                items: list[CandidateItem] | None = None) -> str:
-    s = f"Shopper history\n{profile.text}\n"
+                items: list[CandidateItem] | None = None,
+                labels: tuple[str, str] = DEFAULT_STATE_LABELS) -> str:
+    head, cand = labels
+    s = f"{head}\n{profile.text}\n"
     if item is not None:
-        s += f"\nCandidate product\n{item.text}\n"
+        s += f"\n{cand}\n{item.text}\n"
     if items:
-        s += "\nCandidate products\n" + "\n\n".join(f"[{c.item_id}]\n{c.text}" for c in items) + "\n"
+        s += f"\n{cand}s\n" + "\n\n".join(f"[{c.item_id}]\n{c.text}" for c in items) + "\n"
     return s
 
 
@@ -192,13 +197,15 @@ class DecisionReranker(Reranker):
     def __init__(self, backend: Backend, question: YesNoQuestion,
                  scoring_mode: ScoringMode = "per_pair", concurrency: int = 8,
                  max_retries: int = 6, shuffle_seed: int | None = None,
-                 backoff_base: float = 1.0, backoff_cap: float = 30.0, sleep=None):
+                 backoff_base: float = 1.0, backoff_cap: float = 30.0, sleep=None,
+                 state_labels: tuple[str, str] = DEFAULT_STATE_LABELS):
         if scoring_mode == "listwise":
             raise NotImplementedError("listwise mode is a Track D variant; add after per_pair works")
         self.backend, self.question = backend, question
         self.scoring_mode, self.concurrency = scoring_mode, concurrency
         self.max_retries, self.shuffle_seed = max_retries, shuffle_seed
         self.backoff_base, self.backoff_cap = backoff_base, backoff_cap
+        self.state_labels = tuple(state_labels)
         import time as _time
         self._sleep = sleep or _time.sleep
         self.retry_wait_s = 0.0          # total time spent backing off, reported separately
@@ -234,7 +241,7 @@ class DecisionReranker(Reranker):
     def _per_pair(self, profile, items):
         def one(c):
             try:
-                reply, r = self._call(build_state(profile, item=c), [self.question])
+                reply, r = self._call(build_state(profile, item=c, labels=self.state_labels), [self.question])
                 return reply.probs[0], reply.model_version, r, 0
             except Exception as e:  # noqa: BLE001 - recorded as a failure, never ranked
                 self._record_error(e)
@@ -265,7 +272,7 @@ class DecisionReranker(Reranker):
                                 self.question.true_means, self.question.false_means)
                   for c in chunk_items]
             try:
-                reply, r = self._call(build_state(profile, items=chunk_items), qs)
+                reply, r = self._call(build_state(profile, items=chunk_items, labels=self.state_labels), qs)
                 retries += r
                 versions.add(reply.model_version)
                 for i, p in zip(chunk, reply.probs):

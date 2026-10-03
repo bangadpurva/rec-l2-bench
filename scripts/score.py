@@ -29,7 +29,7 @@ from recl2bench.manifest import RunManifest  # noqa: E402
 from recl2bench.rerankers.base import UserProfile  # noqa: E402
 from recl2bench.runner import run  # noqa: E402
 
-MODELS = ["l1_order", "random", "popularity", "oracle", "bge", "qwen3", "clef", "jev"]
+MODELS = ["l1_order", "random", "popularity", "oracle", "bge", "qwen3", "clef", "jev", "clm"]
 
 
 def load_template(path: Path):
@@ -40,8 +40,13 @@ def load_template(path: Path):
 
 
 def build(model: str, args, positives, cfg_dir: Path):
-    """Return (reranker, model_cfg, template_sha, scoring_mode, concurrency)."""
-    tpath = cfg_dir / "templates" / "yes_no_v1.yaml"
+    """Return (reranker, model_cfg, template_sha, scoring_mode, concurrency).
+
+    `args.template` picks configs/templates/<name>.yaml (default yes_no_v1). A template
+    may add `instruction` (Qwen3 task line) and `state_labels` (decision-model headers).
+    """
+    tpath = cfg_dir / "templates" / f"{getattr(args, 'template', None) or 'yes_no_v1'}.yaml"
+    tdict = yaml.safe_load(tpath.read_text())
     if model == "l1_order":
         from recl2bench.rerankers.dummy import L1OrderReranker
         return L1OrderReranker(), {}, None, None, None
@@ -63,7 +68,7 @@ def build(model: str, args, positives, cfg_dir: Path):
         from recl2bench.rerankers.cross_encoder import Qwen3Reranker
         c = yaml.safe_load((cfg_dir / "models/qwen3_reranker.yaml").read_text())
         q, sha = load_template(tpath)
-        return (Qwen3Reranker(q.question, c["hf_model"], c["revision"], max_length=c["max_length"],
+        return (Qwen3Reranker(tdict.get("instruction", q.question), c["hf_model"], c["revision"], max_length=c["max_length"],
                               batch_size=c["batch_size"]), c, sha, None, None)
     if model in ("clef", "jev"):
         from recl2bench.rerankers.decision import DecisionReranker, make_backend
@@ -72,7 +77,13 @@ def build(model: str, args, positives, cfg_dir: Path):
         mode = args.scoring_mode or c["scoring_mode"]
         be = make_backend(c["backend"], **c)
         conc = getattr(args, "concurrency", None) or c["concurrency"]
-        return DecisionReranker(be, q, mode, concurrency=conc), c, sha, mode, conc
+        kw = {"state_labels": tuple(tdict["state_labels"])} if "state_labels" in tdict else {}
+        return DecisionReranker(be, q, mode, concurrency=conc, **kw), c, sha, mode, conc
+    if model == "clm":
+        from recl2bench.rerankers.clm import CLMReranker
+        c = yaml.safe_load((cfg_dir / "models/clm.yaml").read_text())
+        return CLMReranker(c["emb_url"], engine_kwargs=c.get("engine_kwargs") or {},
+                           model_version=c["model_version"]), c, None, None, None
     raise ValueError(model)
 
 
